@@ -29,6 +29,7 @@ from .core import (
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
 from .providers import ProviderError, complete
+from .web import WebError, research_web
 
 
 class MemoryCreate(BaseModel):
@@ -105,6 +106,22 @@ def create_app(
             lines.append(f"- [{item['kind']}] {item['content']}")
         return "\n".join(lines)
 
+    def web_context(results, documents) -> str:
+        lines = [
+            "Web Research for this request. These are live external sources retrieved by Helix now. "
+            "Use them only for claims they support. Prefer retrieved page text over snippets. "
+            "When you rely on a source, cite it inline as [1], [2], etc. Do not invent sources."
+        ]
+        doc_by_url = {doc.url: doc for doc in documents}
+        for index, result in enumerate(results[:5], start=1):
+            doc = doc_by_url.get(result.url)
+            excerpt = (doc.text[:1200] if doc and doc.text else result.snippet[:500]).strip()
+            lines.append(
+                f"[{index}] {result.title}\nURL: {result.url}\n"
+                f"Excerpt: {excerpt or 'No excerpt available.'}"
+            )
+        return "\n\n".join(lines)
+
     def resolve(req: ChatRequest):
         decision = route_decision(req)
         role = decision.role
@@ -130,11 +147,59 @@ def create_app(
 
         messages = make_messages(role, req)
         memory_hits: list[dict] = []
+        web_sources: list[dict] = []
+        web_error: str | None = None
 
         if req.memory_enabled:
             memory_hits = memory.retrieve(req.messages[-1].content, limit=6)
             if memory_hits:
                 messages.insert(1, {"role": "system", "content": memory_context(memory_hits)})
+
+        if req.web_enabled:
+            try:
+                search_results, documents = research_web(
+                    req.messages[-1].content,
+                    search_limit=5,
+                    fetch_limit=2,
+                )
+                if search_results:
+                    messages.insert(
+                        1,
+                        {"role": "system", "content": web_context(search_results, documents)},
+                    )
+                    web_sources = [
+                        {
+                            "index": index,
+                            "title": item.title,
+                            "url": item.url,
+                            "snippet": item.snippet,
+                        }
+                        for index, item in enumerate(search_results[:5], start=1)
+                    ]
+                else:
+                    web_error = "No web results were found."
+                    messages.insert(
+                        1,
+                        {
+                            "role": "system",
+                            "content": (
+                                "Helix attempted live web research for this request but found no usable results. "
+                                "Do not claim current web verification."
+                            ),
+                        },
+                    )
+            except WebError as exc:
+                web_error = str(exc)
+                messages.insert(
+                    1,
+                    {
+                        "role": "system",
+                        "content": (
+                            "Helix attempted live web research for this request, but the web connector failed. "
+                            "Do not claim current web verification. Be explicit that live web evidence was unavailable."
+                        ),
+                    },
+                )
 
         inputs = input_estimate(messages)
 
@@ -147,7 +212,19 @@ def create_app(
         if estimate > limit:
             raise HTTPException(402, "Task estimate exceeds the spending limit")
 
-        return role, reason, profile, messages, inputs, estimate, memory_hits, decision, mode
+        return (
+            role,
+            reason,
+            profile,
+            messages,
+            inputs,
+            estimate,
+            memory_hits,
+            decision,
+            mode,
+            web_sources,
+            web_error,
+        )
 
     @app.get("/")
     def index():
@@ -167,7 +244,7 @@ def create_app(
                 "routing_scores": True,
                 "adaptive_reasoning": True,
                 "streaming": False,
-                "web": False,
+                "web": True,
                 "files": False,
                 "voice": False,
                 "tools": False,
@@ -240,7 +317,19 @@ def create_app(
 
     @app.post("/api/route", dependencies=[Depends(auth)])
     def route(req: ChatRequest):
-        role, reason, profile, _, inputs, amount, memory_hits, decision, mode = resolve(req)
+        (
+            role,
+            reason,
+            profile,
+            _,
+            inputs,
+            amount,
+            memory_hits,
+            decision,
+            mode,
+            web_sources,
+            web_error,
+        ) = resolve(req)
         return {
             "role": role,
             "reason": reason,
@@ -255,6 +344,9 @@ def create_app(
             "routing_confidence": decision.confidence,
             "routing_scores": decision.scores,
             "reasoning_mode": mode,
+            "web_enabled": req.web_enabled,
+            "web_sources": web_sources,
+            "web_error": web_error,
         }
 
     @app.post("/api/chat", dependencies=[Depends(auth)])
@@ -266,7 +358,19 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
-        role, reason, profile, messages, _, estimate, memory_hits, decision, mode = resolve(req)
+        (
+            role,
+            reason,
+            profile,
+            messages,
+            _,
+            estimate,
+            memory_hits,
+            decision,
+            mode,
+            web_sources,
+            web_error,
+        ) = resolve(req)
         fingerprint = hmac.new(
             api_key.encode(),
             req.model_dump_json().encode(),
@@ -357,6 +461,9 @@ def create_app(
                     if explicit_memory
                     else None
                 ),
+                "web_enabled": req.web_enabled,
+                "web_sources": web_sources,
+                "web_error": web_error,
             }
         finally:
             gate.release()
