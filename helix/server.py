@@ -683,6 +683,14 @@ def create_app(
             "training": False,
         }
 
+    @app.get("/api/knowledge", dependencies=[Depends(auth)])
+    def list_knowledge(limit: int = 100):
+        return {"knowledge": knowledge.list_entries(limit=limit)}
+
+    @app.delete("/api/knowledge", dependencies=[Depends(auth)])
+    def clear_knowledge():
+        return {"deleted": knowledge.clear()}
+
     @app.get("/api/meter", dependencies=[Depends(auth)])
     def meter():
         return ledger.summary()
