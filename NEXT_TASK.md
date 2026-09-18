@@ -1,50 +1,58 @@
-# Next implementation task · HX-002
+# Next implementation task · HX-003
 
 ## Objective
 
-Validate the new memory + scored-routing intelligence layer on the founder Windows PC, then add **streaming responses and cancellation** without introducing paid inference or cloud dependencies.
+Validate the now-useful local stack — streaming, memory, web grounding, sourced learning, files, and conversation history — on the founder Windows PC. After the branch is green, move Engineer toward a **read-only project workspace** without introducing paid inference or unsafe shell authority.
 
-## Current inputs already known
+## Run the local engineering loop
 
-- Windows founder machine.
-- Local Qwen3 4B Q4_K_M served by llama.cpp.
-- llama.cpp API available on loopback port 8080.
-- Helix app available on loopback port 8765.
-- Three Helix roles: Companion, Engineer, Sage.
-- Local provider cost currently $0.
-- Persistent-memory implementation is now present on the active feature branch.
+```powershell
+cd "C:\Users\Administrator\OneDrive\Desktop\helix"
+git fetch origin
+git switch feat/codex-inspired-ui-v02
+git pull --ff-only
+.\DEV_LOOP_WINDOWS.cmd
+```
 
-## Validation loop
+Keep the separate llama.cpp/Qwen server running on port 8080.
 
-1. Pull `feat/codex-inspired-ui-v02`.
-2. Run:
-   ```powershell
-   & ".\.venv\Scripts\python.exe" -m pytest -q
-   & ".\.venv\Scripts\python.exe" -m compileall -q helix tests tools
-   & ".\.venv\Scripts\python.exe" tools\intelligence_eval.py
-   ```
-3. Start llama.cpp and Helix.
-4. In the UI, add a memory manually and verify it appears.
-5. Pin/unpin and delete a memory.
-6. Tell Helix: `Remember that my birthday is September 14.`
-7. Start another relevant turn and confirm Helix can retrieve that stored fact.
-8. Reload the browser and confirm the current conversation restores.
-9. Try several ambiguous prompts and confirm the route panel shows a sensible role, confidence, and fast/deep mode.
-10. Check `git status` for secrets/runtime files before any merge.
+## Founder smoke test
 
-## Next implementation after validation
+1. Send a normal prompt and confirm response text streams progressively.
+2. Start a longer prompt and press **Stop**.
+3. Save a memory and verify later recall.
+4. Create several chats, reload, and switch between recent conversations.
+5. Leave Web on **Auto** and ask a clearly current question.
+6. Confirm source links appear.
+7. Cycle Web to **On** and **Off** and verify the behavior is explicit.
+8. Turn live web off and ask a related question; inspect whether sourced cached knowledge is reused.
+9. Open Memory and inspect/clear learned web knowledge.
+10. Attach a small code/text file and ask Engineer to review or explain it.
+11. Remove the file.
+12. Switch Dark/Light modes.
+13. Run `git status --short` and verify runtime/private files are ignored.
 
-Add streaming/cancellation:
+## Next build after validation
 
-- stream model output from the local compatible provider;
-- show tokens progressively in the chat;
-- allow user cancellation;
-- preserve idempotency and cost accounting;
-- avoid exposing hidden reasoning content;
-- give Companion a fast response path;
-- keep Sage able to use a larger reasoning budget;
-- add tests for disconnects, cancellation, incomplete upstream streams, and uncertain cost accounting.
+### Engineer read-only workspace
+- explicit local project selection/import;
+- project-scoped file index;
+- code-aware relevance retrieval;
+- repository tree/search view;
+- diff planning without mutation;
+- project memory and architecture notes;
+- no automatic shell execution.
 
-## Completion criteria
+### Then controlled engineering actions
+Only after the read-only workspace is stable:
 
-Memory tests and live smoke tests pass on the founder Windows machine, no private memory database or local config is committed, and a streaming implementation is ready in the same engineering loop with zero paid credits.
+- sandboxed command execution;
+- allowlisted read/test/build commands;
+- diff preview before writes;
+- explicit approval boundary for destructive actions;
+- Git status/diff/test evidence;
+- no silent deployment or credential use.
+
+## Completion gate
+
+PR #1 is locally green and the live Qwen smoke tests above pass. Until then, do not merge or advertise streaming/web/files as production-validated.
