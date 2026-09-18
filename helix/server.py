@@ -379,9 +379,12 @@ def create_app(
 
     @app.delete("/api/conversations/{conversation_id}", dependencies=[Depends(auth)])
     def delete_conversation(conversation_id: str):
+        if memory.get_conversation(conversation_id) is None:
+            raise HTTPException(404, "Conversation not found")
+        files_deleted = file_store.clear_conversation(conversation_id)
         if not memory.delete_conversation(conversation_id):
             raise HTTPException(404, "Conversation not found")
-        return {"deleted": True}
+        return {"deleted": True, "files_deleted": files_deleted}
 
 
     @app.post("/api/files", dependencies=[Depends(auth)])
