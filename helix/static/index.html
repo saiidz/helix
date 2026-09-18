@@ -73,7 +73,7 @@
             <span id="theme-label">Light</span>
           </button>
           <button class="ghost-control" type="button" disabled title="Voice is not connected yet">Voice</button>
-          <button class="ghost-control web-toggle" type="button" data-web-toggle aria-pressed="false" title="Use live web research for this request">Web</button>
+          <button class="ghost-control web-toggle" type="button" data-web-toggle aria-pressed="false" title="Web mode: Auto"><span class="web-toggle-label">Web Auto</span></button>
         </div>
       </header>
 
@@ -100,7 +100,7 @@
             <div class="vision-strip">
               <div><span class="vision-dot live"></span><strong>Local AI</strong><small>Connected</small></div>
               <div><span class="vision-dot live"></span><strong>Long-term memory</strong><small>Connected</small></div>
-              <div><span class="vision-dot live"></span><strong>Internet</strong><small>Opt-in</small></div>
+              <div><span class="vision-dot live"></span><strong>Internet</strong><small>Auto + opt-in</small></div>
               <div><span class="vision-dot"></span><strong>Voice</strong><small>Planned</small></div>
               <div><span class="vision-dot"></span><strong>Actions</strong><small>Planned</small></div>
             </div>
@@ -116,7 +116,7 @@
               <div class="left-tools">
                 <button class="tool-button" type="button" disabled title="File attachment is coming next">＋</button>
                 <button class="capability-button" type="button" disabled><span></span> Files</button>
-                <button class="capability-button web-toggle" type="button" data-web-toggle aria-pressed="false"><span></span> Web</button>
+                <button class="capability-button web-toggle" type="button" data-web-toggle aria-pressed="false"><span></span><span class="web-toggle-label">Web Auto</span></button>
               </div>
               <div class="send-zone"><span class="shortcut">Enter ↵</span><button id="send" type="submit">Send</button></div>
             </div>
@@ -152,7 +152,7 @@
         <div class="capability-list">
           <div><span class="cap-state live"></span><strong>Local inference</strong><em>Ready</em></div>
           <div><span class="cap-state live"></span><strong>Persistent memory</strong><em>Ready</em></div>
-          <div><span id="web-cap-state" class="cap-state"></span><strong>Internet</strong><em id="web-cap-label">Available</em></div>
+          <div><span id="web-cap-state" class="cap-state live"></span><strong>Internet</strong><em id="web-cap-label">Auto</em></div>
           <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
           <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
         </div>
@@ -160,7 +160,7 @@
 
       <section class="intel-section safety">
         <div class="intel-section-title">Boundary</div>
-        <p>Helix can only use capabilities shown as active. It will not claim browsing, terminal access, email, voice, or actions that are not connected.</p>
+        <p>Helix only uses connected capabilities. Web research runs in Auto or On mode and returns source links; terminal, email, voice, and external actions remain disconnected.</p>
       </section>
     </aside>
 
