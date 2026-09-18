@@ -723,11 +723,13 @@ async function refreshStatus() {
     const results = await Promise.all([
       api("/api/models"),
       api("/api/meter"),
-      readHealth()
+      readHealth(),
+      api("/api/knowledge/status")
     ]);
     const models = results[0];
     const meter = results[1];
     const health = results[2];
+    const knowledgeStatus = results[3];
 
     const advertised = health.capabilities || {};
     const legacyMemory = health.memory === "local_sqlite";
@@ -768,6 +770,10 @@ async function refreshStatus() {
     byId("model-name").textContent = primaryModel || "—";
     byId("provider-mode").textContent = local ? "Local" : "Mixed";
     byId("runtime-cost").textContent = "$" + meter.model_cost_usd.toFixed(6);
+    const knowledgeLabel = byId("knowledge-cap-label");
+    if (knowledgeLabel) {
+      knowledgeLabel.textContent = knowledgeStatus.count + " sourced";
+    }
     byId("error").textContent = "";
   } catch (error) {
     dot.classList.remove("ready");
