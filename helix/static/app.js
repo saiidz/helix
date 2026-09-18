@@ -11,7 +11,8 @@ let runtimeFeatures = {
   routing_scores: false,
   adaptive_reasoning: false,
   streaming: false,
-  web: false
+  web: false,
+  files: false
 };
 let staleBackendWarningShown = false;
 let currentAbortController = null;
@@ -259,6 +260,89 @@ function openMemoryDrawer() {
 function closeMemoryDrawer() {
   byId("memory-drawer").hidden = true;
   byId("memory-backdrop").hidden = true;
+}
+
+function renderFileChips(files) {
+  const wrap = byId("file-chips");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+
+  for (const file of files) {
+    const chip = document.createElement("span");
+    chip.className = "file-chip";
+    chip.title = file.name + " · " + Math.max(1, Math.round(file.size_bytes / 1024)) + " KB";
+
+    const name = document.createElement("span");
+    name.className = "file-chip-name";
+    name.textContent = file.name;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.fileId = file.id;
+    remove.setAttribute("aria-label", "Remove " + file.name);
+    remove.textContent = "×";
+
+    chip.append(name, remove);
+    wrap.append(chip);
+  }
+}
+
+async function refreshAttachments() {
+  if (!runtimeFeatures.files || !conversationId) {
+    renderFileChips([]);
+    return;
+  }
+
+  try {
+    const data = await api("/api/files/" + encodeURIComponent(conversationId));
+    renderFileChips(data.files || []);
+  } catch (error) {
+    toast("Files: " + error.message);
+  }
+}
+
+async function attachFiles(fileList) {
+  if (!runtimeFeatures.files) {
+    warnStaleBackend();
+    return;
+  }
+
+  await ensureConversation();
+  if (!conversationId) {
+    throw new Error("A conversation is required before attaching files.");
+  }
+
+  const files = Array.from(fileList || []).slice(0, 5);
+  if (!files.length) return;
+
+  let added = 0;
+
+  for (const file of files) {
+    if (file.size > 750000) {
+      toast(file.name + " is too large. Keep text/code files under about 750 KB.");
+      continue;
+    }
+
+    const content = await file.text();
+    if (!content.trim()) {
+      toast(file.name + " is empty or not readable as text.");
+      continue;
+    }
+
+    await api("/api/files", "POST", {
+      conversation_id: conversationId,
+      name: file.name,
+      mime_type: file.type || "text/plain",
+      content
+    });
+    added += 1;
+  }
+
+  await refreshAttachments();
+
+  if (added) {
+    toast("Attached " + added + " local file(s).");
+  }
 }
 
 function renderMemoryList(memories) {
@@ -560,7 +644,7 @@ function streamingMessage(role) {
   byId("messages").append(box);
   box.scrollIntoView({ block: "end", behavior: "smooth" });
 
-  return { box, title, body, meta, text: "", sources: [], knowledge: [] };
+  return { box, title, body, meta, text: "", sources: [], knowledge: [], files: [] };
 }
 
 function setGenerationState(active) {
@@ -635,6 +719,7 @@ async function streamChat(payload, selectedRole) {
           );
           live.sources = event.web_sources || [];
           live.knowledge = event.knowledge_used || [];
+          live.files = event.files_used || [];
           if (event.knowledge_learned) {
             toast("Helix learned " + event.knowledge_learned + " sourced web item(s) locally.");
             refreshKnowledge();
@@ -669,6 +754,7 @@ async function streamChat(payload, selectedRole) {
     live.meta.textContent =
       providerMode + " · " + modelId + " · $" + cost +
       (metaEvent?.memory_used?.length ? " · " + metaEvent.memory_used.length + " memory" : "") +
+      (live.files.length ? " · " + live.files.length + " file" + (live.files.length === 1 ? "" : "s") : "") +
       (live.sources.length ? " · web grounded" : "") +
       " · unverified";
 
@@ -775,6 +861,7 @@ function resetChat() {
   window.localStorage.removeItem("helixConversationId");
   setRole("");
   byId("messages").innerHTML = welcomeMarkup();
+  renderFileChips([]);
   wireIntentCards();
   byId("prompt").focus();
 }
@@ -804,10 +891,23 @@ async function refreshStatus() {
       routing_scores: Boolean(advertised.routing_scores),
       adaptive_reasoning: Boolean(advertised.adaptive_reasoning),
       streaming: Boolean(advertised.streaming),
-      web: Boolean(advertised.web)
+      web: Boolean(advertised.web),
+      files: Boolean(advertised.files)
     };
 
     setWebMode(webMode, false);
+
+    document.querySelectorAll("[data-file-picker]").forEach(button => {
+      button.disabled = !runtimeFeatures.files;
+      button.title = runtimeFeatures.files
+        ? "Attach text or code files"
+        : "Restart Helix to enable local file attachments";
+    });
+
+    const fileState = byId("file-cap-state");
+    const fileLabel = byId("file-cap-label");
+    if (fileState) fileState.classList.toggle("live", runtimeFeatures.files);
+    if (fileLabel) fileLabel.textContent = runtimeFeatures.files ? "Ready" : "Restart";
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -871,6 +971,42 @@ byId("theme-toggle").addEventListener("click", toggleTheme);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
+
+document.querySelectorAll("[data-file-picker]").forEach(button => {
+  button.addEventListener("click", () => {
+    if (!runtimeFeatures.files) {
+      warnStaleBackend();
+      return;
+    }
+    byId("file-input").click();
+  });
+});
+
+byId("file-input").addEventListener("change", async event => {
+  try {
+    await attachFiles(event.target.files);
+  } catch (error) {
+    toast("Files: " + error.message);
+  } finally {
+    event.target.value = "";
+  }
+});
+
+byId("file-chips").addEventListener("click", async event => {
+  const button = event.target.closest("[data-file-id]");
+  if (!button || !conversationId) return;
+
+  try {
+    await api(
+      "/api/files/" + encodeURIComponent(conversationId) + "/" + encodeURIComponent(button.dataset.fileId),
+      "DELETE"
+    );
+    toast("Attachment removed.");
+    await refreshAttachments();
+  } catch (error) {
+    toast("Files: " + error.message);
+  }
+});
 
 document.querySelectorAll("[data-web-toggle]").forEach(button => {
   button.addEventListener("click", cycleWebMode);
@@ -1073,6 +1209,9 @@ byId("chat-form").addEventListener("submit", async event => {
         (data.memory_used && data.memory_used.length
           ? " · " + data.memory_used.length + " memory"
           : "") +
+        (data.files_used && data.files_used.length
+          ? " · " + data.files_used.length + " file" + (data.files_used.length === 1 ? "" : "s")
+          : "") +
         (data.web_sources && data.web_sources.length
           ? " · web grounded"
           : "") +
@@ -1139,6 +1278,7 @@ byId("chat-form").addEventListener("submit", async event => {
       try {
         await loadConversation();
         await refreshMemories();
+        await refreshAttachments();
       } catch (error) {
         byId("error").textContent = error.message;
       }
