@@ -26,7 +26,7 @@
 
       <nav class="primary-nav" aria-label="Helix navigation">
         <button class="nav-item active" type="button"><span class="nav-icon">◫</span><span>Chat</span></button>
-        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Projects"><span class="nav-icon">⌘</span><span>Projects</span><em>Soon</em></button>
+        <button id="projects-nav" class="nav-item" type="button"><span class="nav-icon">⌘</span><span>Projects</span><em>Ready</em></button>
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tasks"><span class="nav-icon">✓</span><span>Tasks</span><em>Soon</em></button>
         <button id="memory-nav" class="nav-item" type="button"><span class="nav-icon">◎</span><span>Memory</span><em>Ready</em></button>
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tools"><span class="nav-icon">◇</span><span>Tools</span><em>Soon</em></button>
@@ -117,7 +117,11 @@
 
         <div class="composer-zone">
           <form id="chat-form" class="composer">
-            <div class="composer-topline"><span id="composer-mode"><span class="brain-dot auto"></span> Auto route</span><span id="thinking-mode">Fast by default</span></div>
+            <div class="composer-topline">
+              <span id="composer-mode"><span class="brain-dot auto"></span> Auto route</span>
+              <span id="active-project-chip" class="active-project-chip" hidden></span>
+              <span id="thinking-mode">Fast by default</span>
+            </div>
             <div id="file-chips" class="file-chips" aria-live="polite"></div>
             <label class="sr-only" for="prompt">Your message</label>
             <textarea id="prompt" rows="1" maxlength="12000" required placeholder="Ask Helix anything…"></textarea>
@@ -165,6 +169,7 @@
           <div><span class="cap-state live"></span><strong>Persistent memory</strong><em>Ready</em></div>
           <div><span id="web-cap-state" class="cap-state live"></span><strong>Internet</strong><em id="web-cap-label">Auto</em></div>
           <div><span id="file-cap-state" class="cap-state live"></span><strong>Files</strong><em id="file-cap-label">Ready</em></div>
+          <div><span id="project-cap-state" class="cap-state live"></span><strong>Projects</strong><em id="project-cap-label">Ready</em></div>
           <div><span class="cap-state live"></span><strong>Learned knowledge</strong><em id="knowledge-cap-label">0 sourced</em></div>
           <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
           <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
@@ -176,6 +181,50 @@
         <p>Helix only uses connected capabilities. Web research runs in Auto or On mode and returns source links; terminal, email, voice, and external actions remain disconnected.</p>
       </section>
     </aside>
+
+    <aside id="projects-drawer" class="projects-drawer" hidden>
+      <div class="projects-drawer-head">
+        <div>
+          <span class="section-label">Read-only engineering context</span>
+          <h2>Projects</h2>
+        </div>
+        <button id="projects-close" class="drawer-close" type="button" aria-label="Close projects">×</button>
+      </div>
+
+      <p class="projects-intro">Import a code folder explicitly. Helix stores a local text snapshot for search and analysis. It cannot run or modify the project yet.</p>
+
+      <form id="project-form" class="project-form">
+        <input id="project-name" type="text" maxlength="120" placeholder="Project name" required>
+        <button id="project-create" type="submit">Create project</button>
+      </form>
+
+      <div id="project-list" class="project-list"></div>
+
+      <section id="project-detail" class="project-detail" hidden>
+        <div class="project-detail-head">
+          <div>
+            <span class="section-label">Active project</span>
+            <h3 id="project-detail-name">Project</h3>
+          </div>
+          <button id="project-delete" class="project-delete" type="button">Delete</button>
+        </div>
+
+        <div class="project-actions">
+          <button id="project-import" type="button">Import folder</button>
+          <button id="project-refresh" type="button">Refresh</button>
+        </div>
+        <input id="project-folder-input" class="sr-only" type="file" multiple webkitdirectory directory>
+
+        <div class="project-stats">
+          <span id="project-file-count">0 files</span>
+          <span>Read-only snapshot</span>
+        </div>
+
+        <div id="project-file-list" class="project-file-list"></div>
+      </section>
+    </aside>
+
+    <div id="projects-backdrop" class="memory-backdrop" hidden></div>
 
     <aside id="memory-drawer" class="memory-drawer" hidden>
       <div class="memory-drawer-head">
