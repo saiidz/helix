@@ -478,6 +478,7 @@ def create_app(
             web_error,
             knowledge_hits,
             knowledge_learned,
+            file_hits,
         ) = resolve(req)
         fingerprint = hmac.new(
             api_key.encode(),
@@ -608,6 +609,7 @@ def create_app(
             web_error,
             knowledge_hits,
             knowledge_learned,
+            file_hits,
         ) = resolve(req)
 
         fingerprint = hmac.new(
