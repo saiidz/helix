@@ -12,6 +12,7 @@ import re
 import socket
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, quote_plus, unquote, urlsplit
@@ -311,12 +312,29 @@ def fetch_web_text(url: str, max_chars: int = 12_000) -> WebDocument:
 
 def research_web(query: str, search_limit: int = 5, fetch_limit: int = 3) -> tuple[list[SearchResult], list[WebDocument]]:
     results = search_web(query, limit=search_limit)
-    documents: list[WebDocument] = []
+    targets = results[: max(0, min(fetch_limit, 3))]
+    if not targets:
+        return results, []
 
-    for result in results[: max(0, min(fetch_limit, 3))]:
-        try:
-            documents.append(fetch_web_text(result.url))
-        except WebError:
-            continue
+    documents_by_url: dict[str, WebDocument] = {}
 
+    # Fetch a small number of pages concurrently so live research does not add
+    # serial page latency to every request.
+    with ThreadPoolExecutor(max_workers=len(targets)) as pool:
+        futures = {
+            pool.submit(fetch_web_text, result.url, 4000): result.url
+            for result in targets
+        }
+        for future in as_completed(futures):
+            url = futures[future]
+            try:
+                documents_by_url[url] = future.result()
+            except (WebError, Exception):
+                continue
+
+    documents = [
+        documents_by_url[result.url]
+        for result in targets
+        if result.url in documents_by_url
+    ]
     return results, documents
