@@ -329,7 +329,7 @@ def research_web(query: str, search_limit: int = 5, fetch_limit: int = 3) -> tup
             url = futures[future]
             try:
                 documents_by_url[url] = future.result()
-            except (WebError, Exception):
+            except Exception:
                 continue
 
     documents = [
