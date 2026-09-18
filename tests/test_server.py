@@ -354,6 +354,34 @@ def test_file_upload_and_context_injection(tmp_path,monkeypatch):
     ).json()["files"] == []
 
 
+def test_deleting_conversation_cleans_attachments(tmp_path):
+    c=client(tmp_path)
+    conversation=c.post(
+        "/api/conversations",
+        headers=HEADERS,
+        json={"title":"cleanup"},
+    ).json()["conversation"]
+
+    uploaded=c.post(
+        "/api/files",
+        headers=HEADERS,
+        json={
+            "conversation_id":conversation["id"],
+            "name":"notes.txt",
+            "mime_type":"text/plain",
+            "content":"cleanup me",
+        },
+    )
+    assert uploaded.status_code == 200
+
+    deleted=c.delete(
+        f"/api/conversations/{conversation['id']}",
+        headers=HEADERS,
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["files_deleted"] == 1
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
