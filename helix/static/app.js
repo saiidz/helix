@@ -4,6 +4,7 @@ const byId = id => document.getElementById(id);
 
 let chatHistory = [];
 let previousRole = null;
+let conversationId = window.localStorage.getItem("helixConversationId") || null;
 
 const roleName = role => {
   if (!role) return "Auto";
@@ -51,6 +52,130 @@ function toast(text) {
 function removeWelcome() {
   const welcome = byId("welcome");
   if (welcome) welcome.remove();
+}
+
+async function ensureConversation() {
+  if (conversationId) return conversationId;
+
+  const data = await api(
+    "/api/conversations",
+    "POST",
+    { title: "New conversation" }
+  );
+
+  conversationId = data.conversation.id;
+  window.localStorage.setItem("helixConversationId", conversationId);
+  return conversationId;
+}
+
+async function loadConversation() {
+  if (!conversationId) return;
+
+  try {
+    const data = await api("/api/conversations/" + encodeURIComponent(conversationId));
+    const stored = data.conversation.messages || [];
+
+    if (!stored.length) return;
+
+    byId("messages").innerHTML = "";
+    chatHistory = [];
+
+    for (const item of stored) {
+      if (item.role === "user") {
+        message("You", item.content, "user");
+      } else {
+        message("Helix", item.content, "assistant", "restored from local conversation");
+      }
+
+      chatHistory.push({ role: item.role, content: item.content });
+    }
+
+    toast("Restored your local conversation.");
+  } catch (error) {
+    if (String(error.message).includes("Conversation not found")) {
+      conversationId = null;
+      window.localStorage.removeItem("helixConversationId");
+      return;
+    }
+    throw error;
+  }
+}
+
+function openMemoryDrawer() {
+  byId("memory-drawer").hidden = false;
+  byId("memory-backdrop").hidden = false;
+  refreshMemories();
+}
+
+function closeMemoryDrawer() {
+  byId("memory-drawer").hidden = true;
+  byId("memory-backdrop").hidden = true;
+}
+
+function renderMemoryList(memories) {
+  const list = byId("memory-list");
+  list.innerHTML = "";
+
+  if (!memories.length) {
+    const empty = document.createElement("div");
+    empty.className = "memory-empty";
+    empty.textContent = "No saved memories yet. Add one here or tell Helix “Remember that …”";
+    list.append(empty);
+    return;
+  }
+
+  for (const item of memories) {
+    const card = document.createElement("article");
+    card.className = "memory-item";
+    card.dataset.memoryId = item.id;
+
+    const top = document.createElement("div");
+    top.className = "memory-item-top";
+
+    const kind = document.createElement("span");
+    kind.className = "memory-kind";
+    kind.textContent = item.kind + (item.pinned ? " · pinned" : "");
+
+    const actions = document.createElement("div");
+    actions.className = "memory-item-actions";
+
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.dataset.memoryAction = "pin";
+    pin.dataset.pinned = item.pinned ? "true" : "false";
+    pin.textContent = item.pinned ? "Unpin" : "Pin";
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.memoryAction = "delete";
+    remove.textContent = "Delete";
+
+    actions.append(pin, remove);
+    top.append(kind, actions);
+
+    const text = document.createElement("p");
+    text.textContent = item.content;
+
+    const meta = document.createElement("div");
+    meta.className = "memory-item-meta";
+    meta.textContent = "Source: " + item.source;
+
+    card.append(top, text, meta);
+    list.append(card);
+  }
+}
+
+async function refreshMemories() {
+  try {
+    const data = await api("/api/memories?limit=100");
+    renderMemoryList(data.memories || []);
+  } catch (error) {
+    byId("memory-list").innerHTML = "";
+    const empty = document.createElement("div");
+    empty.className = "memory-empty";
+    empty.textContent = error.message;
+    byId("memory-list").append(empty);
+  }
 }
 
 function appendInline(parent, text) {
@@ -227,7 +352,7 @@ function welcomeMarkup() {
     "</div>",
     '<div class="vision-strip">',
     '<div><span class="vision-dot live"></span><strong>Local AI</strong><small>Connected</small></div>',
-    '<div><span class="vision-dot"></span><strong>Long-term memory</strong><small>Next</small></div>',
+    '<div><span class="vision-dot live"></span><strong>Long-term memory</strong><small>Connected</small></div>',
     '<div><span class="vision-dot"></span><strong>Internet</strong><small>Next</small></div>',
     '<div><span class="vision-dot"></span><strong>Voice</strong><small>Planned</small></div>',
     '<div><span class="vision-dot"></span><strong>Actions</strong><small>Planned</small></div>',
@@ -239,6 +364,8 @@ function welcomeMarkup() {
 function resetChat() {
   chatHistory = [];
   previousRole = null;
+  conversationId = null;
+  window.localStorage.removeItem("helixConversationId");
   setRole("");
   byId("messages").innerHTML = welcomeMarkup();
   wireIntentCards();
@@ -298,6 +425,63 @@ function autoGrow() {
 
 byId("status").addEventListener("click", refreshStatus);
 byId("new-chat").addEventListener("click", resetChat);
+byId("memory-nav").addEventListener("click", openMemoryDrawer);
+byId("memory-close").addEventListener("click", closeMemoryDrawer);
+byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
+
+byId("memory-form").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const memoryContent = byId("memory-content").value.trim();
+  if (!memoryContent) return;
+
+  byId("memory-save").disabled = true;
+
+  try {
+    await api("/api/memories", "POST", {
+      content: memoryContent,
+      kind: byId("memory-kind").value,
+      pinned: byId("memory-pinned").checked,
+      importance: byId("memory-pinned").checked ? 0.9 : 0.6
+    });
+
+    byId("memory-content").value = "";
+    byId("memory-pinned").checked = false;
+    toast("Memory saved locally.");
+    await refreshMemories();
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    byId("memory-save").disabled = false;
+  }
+});
+
+byId("memory-list").addEventListener("click", async event => {
+  const button = event.target.closest("[data-memory-action]");
+  if (!button) return;
+
+  const card = button.closest("[data-memory-id]");
+  const memoryId = card.dataset.memoryId;
+
+  try {
+    if (button.dataset.memoryAction === "delete") {
+      await api("/api/memories/" + encodeURIComponent(memoryId), "DELETE");
+      toast("Memory deleted.");
+    } else {
+      const pinned = button.dataset.pinned !== "true";
+      await api(
+        "/api/memories/" + encodeURIComponent(memoryId),
+        "PATCH",
+        { pinned }
+      );
+      toast(pinned ? "Memory pinned." : "Memory unpinned.");
+    }
+
+    await refreshMemories();
+  } catch (error) {
+    toast(error.message);
+  }
+});
 
 document.querySelectorAll(".brain-choice").forEach(button => {
   button.addEventListener("click", () => setRole(button.dataset.role));
@@ -334,6 +518,15 @@ byId("chat-form").addEventListener("submit", async event => {
   byId("error").textContent = "";
 
   const selectedRole = byId("role").value || null;
+
+  try {
+    await ensureConversation();
+  } catch (error) {
+    byId("send").disabled = false;
+    byId("error").textContent = error.message;
+    return;
+  }
+
   const current = [
     ...chatHistory.slice(-14),
     { role: "user", content: text }
@@ -343,6 +536,8 @@ byId("chat-form").addEventListener("submit", async event => {
     messages: current,
     role: selectedRole,
     previous_role: previousRole,
+    conversation_id: conversationId,
+    memory_enabled: true,
     allow_external: false,
     max_output_tokens: selectedRole === "sage" ? 1024 : 512,
     max_cost_usd: byId("budget").value
@@ -369,8 +564,17 @@ byId("chat-form").addEventListener("submit", async event => {
       data.text,
       "assistant",
       data.provider_mode + " · " + data.model_id + " · $" +
-        data.model_cost_usd.toFixed(6) + " · unverified"
+        data.model_cost_usd.toFixed(6) +
+        (data.memory_used && data.memory_used.length
+          ? " · " + data.memory_used.length + " memory"
+          : "") +
+        " · unverified"
     );
+
+    if (data.memory_saved) {
+      toast("Helix saved that to your private local memory.");
+      refreshMemories();
+    }
 
     chatHistory = [
       ...current,
@@ -406,7 +610,15 @@ byId("chat-form").addEventListener("submit", async event => {
       );
     }
 
-    setTimeout(refreshStatus, 250);
+    setTimeout(async () => {
+      await refreshStatus();
+      try {
+        await loadConversation();
+        await refreshMemories();
+      } catch (error) {
+        byId("error").textContent = error.message;
+      }
+    }, 250);
   }
 })();
 
