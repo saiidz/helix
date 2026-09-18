@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import threading
 from datetime import date
@@ -33,6 +34,7 @@ from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
 from .projects import ProjectStore
 from .providers import ProviderError, complete, stream_complete
+from .tasks import TaskStore
 from .web import WebError, research_web
 
 
@@ -75,6 +77,16 @@ class ProjectFileBatchCreate(BaseModel):
     files: list[ProjectFileCreate] = Field(min_length=1, max_length=25)
 
 
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    details: str = Field(default="", max_length=4000)
+    due_at: str | None = Field(default=None, max_length=64)
+
+
+class TaskPatch(BaseModel):
+    done: bool
+
+
 def create_app(
     settings: Settings,
     api_key: str,
@@ -96,6 +108,7 @@ def create_app(
     knowledge = KnowledgeStore(ledger_path.with_name("knowledge.sqlite3"))
     file_store = FileStore(ledger_path.with_name("files.sqlite3"))
     projects = ProjectStore(ledger_path.with_name("projects.sqlite3"))
+    tasks = TaskStore(ledger_path.with_name("tasks.sqlite3"))
     gate = threading.BoundedSemaphore(2)
     assets = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=assets), name="static")
@@ -204,6 +217,17 @@ def create_app(
             )
         return "\n\n".join(lines)
 
+
+    def task_context(items: list[dict]) -> str:
+        lines = [
+            "Task Context. These are the user's local Helix tasks. Use them when planning or answering task-list "
+            "questions. A task can exist here without any background notification being scheduled."
+        ]
+        for index, item in enumerate(items[:12], start=1):
+            due = f" · due {item['due_at']}" if item.get("due_at") else ""
+            lines.append(f"[T{index}] {item['title']}{due}")
+        return "\n".join(lines)
+
     def resolve(req: ChatRequest):
         decision = route_decision(req)
         role = decision.role
@@ -241,6 +265,16 @@ def create_app(
             memory_hits = memory.retrieve(req.messages[-1].content, limit=6)
             if memory_hits:
                 messages.insert(1, {"role": "system", "content": memory_context(memory_hits)})
+
+
+        if role.value == "companion" and re.search(
+            r"\b(task|tasks|todo|to-do|task list|plan my day|what do i need|what should i do|schedule)\b",
+            req.messages[-1].content,
+            flags=re.IGNORECASE,
+        ):
+            task_hits = tasks.list(status="open", limit=12)
+            if task_hits:
+                messages.insert(1, {"role": "system", "content": task_context(task_hits)})
 
         if req.conversation_id:
             file_hits = file_store.retrieve(
@@ -372,6 +406,7 @@ def create_app(
                 "web": True,
                 "files": True,
                 "projects": True,
+                "tasks": True,
                 "voice": False,
                 "tools": False,
                 "knowledge_cache": True,
@@ -522,6 +557,41 @@ def create_app(
             raise HTTPException(404, "Project not found")
         return {"deleted": True}
 
+
+    @app.post("/api/tasks", dependencies=[Depends(auth)])
+    def create_task(body: TaskCreate):
+        try:
+            return {
+                "task": tasks.add(
+                    body.title,
+                    details=body.details,
+                    due_at=body.due_at,
+                    source="user",
+                )
+            }
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/api/tasks", dependencies=[Depends(auth)])
+    def list_tasks(status: str = "open", limit: int = 100):
+        try:
+            return {"tasks": tasks.list(status=status, limit=limit)}
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.patch("/api/tasks/{task_id}", dependencies=[Depends(auth)])
+    def patch_task(task_id: str, body: TaskPatch):
+        item = tasks.set_done(task_id, body.done)
+        if item is None:
+            raise HTTPException(404, "Task not found")
+        return {"task": item}
+
+    @app.delete("/api/tasks/{task_id}", dependencies=[Depends(auth)])
+    def delete_task(task_id: str):
+        if not tasks.delete(task_id):
+            raise HTTPException(404, "Task not found")
+        return {"deleted": True}
+
     @app.post("/api/route", dependencies=[Depends(auth)])
     def route(req: ChatRequest):
         (
@@ -612,6 +682,7 @@ def create_app(
             raise HTTPException(429, "Two requests are already running; try again after completion")
 
         explicit_memory = None
+        task_saved = None
 
         try:
             try:
@@ -630,6 +701,20 @@ def create_app(
 
             if req.memory_enabled:
                 explicit_memory = memory.capture_explicit(req.messages[-1].content)
+
+            task_saved = tasks.capture_explicit(req.messages[-1].content)
+            if task_saved:
+                messages.insert(
+                    1,
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Helix saved a local task: {task_saved['title']}. "
+                            "Tell the user it was added to their Helix task list. "
+                            "Do not claim that a notification or reminder was scheduled."
+                        ),
+                    },
+                )
 
             try:
                 result = complete(profile, messages, req.max_output_tokens)
@@ -709,6 +794,7 @@ def create_app(
                     {"id": item["id"], "path": item["path"], "language": item["language"]}
                     for item in project_hits
                 ],
+                "task_saved": task_saved,
             }
         finally:
             gate.release()
@@ -770,6 +856,20 @@ def create_app(
         if req.memory_enabled:
             explicit_memory = memory.capture_explicit(req.messages[-1].content)
 
+        task_saved = tasks.capture_explicit(req.messages[-1].content)
+        if task_saved:
+            messages.insert(
+                1,
+                {
+                    "role": "system",
+                    "content": (
+                        f"Helix saved a local task: {task_saved['title']}. "
+                        "Tell the user it was added to their Helix task list. "
+                        "Do not claim that a notification or reminder was scheduled."
+                    ),
+                },
+            )
+
         meta = {
             "type": "meta",
             "role": role,
@@ -811,6 +911,7 @@ def create_app(
                 {"id": item["id"], "path": item["path"], "language": item["language"]}
                 for item in project_hits
             ],
+            "task_saved": task_saved,
         }
 
         def events():
