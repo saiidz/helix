@@ -9,9 +9,11 @@ let runtimeFeatures = {
   persistent_memory: false,
   persistent_conversations: false,
   routing_scores: false,
-  adaptive_reasoning: false
+  adaptive_reasoning: false,
+  web: false
 };
 let staleBackendWarningShown = false;
+let webEnabled = false;
 
 const THEME_KEY = "helixTheme";
 
@@ -37,6 +39,27 @@ function applyTheme(theme) {
 function toggleTheme() {
   const current = document.documentElement.dataset.theme || "dark";
   applyTheme(current === "dark" ? "light" : "dark");
+}
+
+function setWebEnabled(enabled) {
+  webEnabled = Boolean(enabled && runtimeFeatures.web);
+
+  document.querySelectorAll("[data-web-toggle]").forEach(button => {
+    button.classList.toggle("active", webEnabled);
+    button.setAttribute("aria-pressed", webEnabled ? "true" : "false");
+    button.title = runtimeFeatures.web
+      ? (webEnabled ? "Live web research is on" : "Use live web research for this request")
+      : "Restart Helix to enable the web connector";
+  });
+
+  const state = byId("web-cap-state");
+  const label = byId("web-cap-label");
+  if (state) state.classList.toggle("live", webEnabled);
+  if (label) label.textContent = runtimeFeatures.web
+    ? (webEnabled ? "On" : "Available")
+    : "Restart";
+
+  toast(webEnabled ? "Live web research enabled." : "Live web research disabled.");
 }
 
 const roleName = role => {
@@ -313,7 +336,30 @@ function renderRichText(container, text) {
   }
 }
 
-function message(label, text, type, meta = "") {
+function appendSources(box, sources) {
+  if (!Array.isArray(sources) || !sources.length) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "sources";
+
+  const heading = document.createElement("div");
+  heading.className = "sources-title";
+  heading.textContent = "Web sources";
+  wrap.append(heading);
+
+  for (const source of sources) {
+    const link = document.createElement("a");
+    link.href = source.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "[" + source.index + "] " + source.title;
+    wrap.append(link);
+  }
+
+  box.append(wrap);
+}
+
+function message(label, text, type, meta = "", sources = []) {
   removeWelcome();
 
   const box = document.createElement("div");
@@ -343,6 +389,7 @@ function message(label, text, type, meta = "") {
     box.append(tag);
   }
 
+  appendSources(box, sources);
   byId("messages").append(box);
   box.scrollIntoView({ block: "end", behavior: "smooth" });
   return box;
@@ -469,8 +516,14 @@ async function refreshStatus() {
       persistent_memory: Boolean(advertised.persistent_memory || legacyMemory),
       persistent_conversations: Boolean(advertised.persistent_conversations || legacyMemory),
       routing_scores: Boolean(advertised.routing_scores),
-      adaptive_reasoning: Boolean(advertised.adaptive_reasoning)
+      adaptive_reasoning: Boolean(advertised.adaptive_reasoning),
+      web: Boolean(advertised.web)
     };
+
+    if (!runtimeFeatures.web && webEnabled) {
+      webEnabled = false;
+    }
+    setWebEnabled(webEnabled);
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -530,6 +583,16 @@ byId("theme-toggle").addEventListener("click", toggleTheme);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
+
+document.querySelectorAll("[data-web-toggle]").forEach(button => {
+  button.addEventListener("click", () => {
+    if (!runtimeFeatures.web) {
+      warnStaleBackend();
+      return;
+    }
+    setWebEnabled(!webEnabled);
+  });
+});
 
 byId("memory-form").addEventListener("submit", async event => {
   event.preventDefault();
@@ -651,6 +714,10 @@ byId("chat-form").addEventListener("submit", async event => {
     payload.memory_enabled = true;
   }
 
+  if (runtimeFeatures.web) {
+    payload.web_enabled = webEnabled;
+  }
+
   message("You", text, "user");
   const pending = pendingMessage(selectedRole);
 
@@ -676,8 +743,16 @@ byId("chat-form").addEventListener("submit", async event => {
         (data.memory_used && data.memory_used.length
           ? " · " + data.memory_used.length + " memory"
           : "") +
-        " · unverified"
+        (data.web_sources && data.web_sources.length
+          ? " · web grounded"
+          : "") +
+        " · unverified",
+      data.web_sources || []
     );
+
+    if (data.web_error) {
+      toast("Web: " + data.web_error);
+    }
 
     if (data.memory_saved && runtimeFeatures.persistent_memory) {
       toast("Helix saved that to your private local memory.");
