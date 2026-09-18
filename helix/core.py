@@ -237,6 +237,17 @@ def route_decision(req: ChatRequest) -> RouteDecision:
         Role.SAGE.value: _score_patterns(text, SAGE_PATTERNS),
     }
 
+    # An explicitly active code project is a strong contextual signal. This lets
+    # natural follow-ups like "where is this handled?" stay in Engineer without
+    # forcing users to repeat coding keywords on every turn.
+    if req.project_id:
+        scores[Role.ENGINEER.value] += 2
+        if re.search(
+            r"\b(this|that|it|where|why|how|fix|change|implement|find|search|review|explain)\b",
+            text,
+        ):
+            scores[Role.ENGINEER.value] += 2
+
     ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     top_name, top_score = ordered[0]
     second_score = ordered[1][1]
