@@ -382,6 +382,87 @@ def test_deleting_conversation_cleans_attachments(tmp_path):
     assert deleted.json()["files_deleted"] == 1
 
 
+def test_project_workspace_api_and_chat_context(tmp_path,monkeypatch):
+    captured={}
+
+    def fake_complete(profile,messages,max_output):
+        captured["messages"]=messages
+        return Completion("Project answer.",10,5)
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    c=client(tmp_path)
+
+    created=c.post(
+        "/api/projects",
+        headers=HEADERS,
+        json={"name":"Helix project"},
+    )
+    assert created.status_code == 200, created.text
+    project=created.json()["project"]
+
+    uploaded=c.post(
+        f"/api/projects/{project['id']}/files",
+        headers=HEADERS,
+        json={
+            "path":"src/router.py",
+            "content":"def route_request():\n    return 'engineer'\n",
+        },
+    )
+    assert uploaded.status_code == 200, uploaded.text
+
+    details=c.get(
+        f"/api/projects/{project['id']}",
+        headers=HEADERS,
+    )
+    assert details.status_code == 200
+    assert details.json()["project"]["file_count"] == 1
+    assert details.json()["files"][0]["path"] == "src/router.py"
+
+    response=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"project-chat-request1",
+        },
+        json={
+            "project_id":project["id"],
+            "messages":[{"role":"user","content":"Where is route_request implemented?"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    data=response.json()
+    assert data["project"]["id"] == project["id"]
+    assert data["project_files_used"][0]["path"] == "src/router.py"
+    assert any(
+        "Active Project: Helix project" in message["content"]
+        and "route_request" in message["content"]
+        for message in captured["messages"]
+        if message["role"] == "system"
+    )
+
+    deleted=c.delete(
+        f"/api/projects/{project['id']}",
+        headers=HEADERS,
+    )
+    assert deleted.status_code == 200
+
+
+def test_project_rejects_binary_extension(tmp_path):
+    c=client(tmp_path)
+    project=c.post(
+        "/api/projects",
+        headers=HEADERS,
+        json={"name":"Binary guard"},
+    ).json()["project"]
+
+    response=c.post(
+        f"/api/projects/{project['id']}/files",
+        headers=HEADERS,
+        json={"path":"assets/logo.png","content":"fake binary"},
+    )
+    assert response.status_code == 422
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
@@ -394,4 +475,5 @@ def test_model_endpoint_and_policy(tmp_path):
     assert health["capabilities"]["web"] is True
     assert health["capabilities"]["knowledge_cache"] is True
     assert health["capabilities"]["files"] is True
+    assert health["capabilities"]["projects"] is True
     assert "frame-ancestors 'none'" in c.get("/").headers["Content-Security-Policy"]
