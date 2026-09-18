@@ -1289,3 +1289,29 @@ html[data-theme="light"] .task-item,
 html[data-theme="light"] .task-filter{
   background:#fff;
 }
+
+
+/* Task alert control */
+.task-alerts{
+  margin-left:auto;
+  padding:5px 8px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:var(--panel);
+  color:var(--muted2);
+  cursor:pointer;
+  font-size:7px;
+}
+.task-alerts:hover{border-color:var(--border2);color:var(--text)}
+.task-alerts.active{
+  border-color:rgba(69,199,255,.35);
+  background:linear-gradient(90deg,rgba(47,99,246,.13),rgba(108,67,255,.08));
+  color:var(--brand-cyan);
+}
+.task-alert-note{
+  margin:-2px 0 9px;
+  color:var(--muted2);
+  font-size:7px;
+  line-height:1.4;
+}
+html[data-theme="light"] .task-alerts{background:#fff}
