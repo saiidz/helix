@@ -213,29 +213,108 @@ async function ensureConversation() {
   }
 }
 
+function renderConversationMessages(conversation) {
+  const stored = conversation.messages || [];
+  byId("messages").innerHTML = "";
+  chatHistory = [];
+  previousRole = null;
+
+  if (!stored.length) {
+    byId("messages").innerHTML = welcomeMarkup();
+    wireIntentCards();
+    return;
+  }
+
+  for (const item of stored) {
+    if (item.role === "user") {
+      message("You", item.content, "user");
+    } else {
+      message("Helix", item.content, "assistant", "restored from local conversation");
+    }
+
+    chatHistory.push({ role: item.role, content: item.content });
+  }
+}
+
+function renderConversationList(conversations) {
+  const list = byId("conversation-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!conversations.length) {
+    const empty = document.createElement("div");
+    empty.className = "conversation-empty";
+    empty.textContent = "No conversations yet";
+    list.append(empty);
+    return;
+  }
+
+  for (const conversation of conversations) {
+    const row = document.createElement("div");
+    row.className = "conversation-row";
+    row.classList.toggle("active", conversation.id === conversationId);
+    row.dataset.conversationId = conversation.id;
+
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "conversation-open";
+    open.dataset.conversationOpen = conversation.id;
+    open.title = conversation.title;
+
+    const title = document.createElement("span");
+    title.textContent = conversation.title || "New conversation";
+
+    const when = document.createElement("small");
+    when.textContent = new Date(conversation.updated_at).toLocaleDateString();
+
+    open.append(title, when);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "conversation-delete";
+    remove.dataset.conversationDelete = conversation.id;
+    remove.setAttribute("aria-label", "Delete " + (conversation.title || "conversation"));
+    remove.textContent = "×";
+
+    row.append(open, remove);
+    list.append(row);
+  }
+}
+
+async function refreshConversationList() {
+  if (!runtimeFeatures.persistent_conversations) return;
+
+  try {
+    const data = await api("/api/conversations?limit=12");
+    renderConversationList(data.conversations || []);
+  } catch (error) {
+    const list = byId("conversation-list");
+    if (list) {
+      list.innerHTML = '<div class="conversation-empty">Could not load history</div>';
+    }
+  }
+}
+
+async function loadConversationById(id, announce = true) {
+  if (!runtimeFeatures.persistent_conversations) return;
+
+  const data = await api("/api/conversations/" + encodeURIComponent(id));
+  conversationId = data.conversation.id;
+  window.localStorage.setItem("helixConversationId", conversationId);
+  renderConversationMessages(data.conversation);
+  await refreshAttachments();
+  await refreshConversationList();
+
+  if (announce) {
+    toast("Conversation restored.");
+  }
+}
+
 async function loadConversation() {
   if (!runtimeFeatures.persistent_conversations || !conversationId) return;
 
   try {
-    const data = await api("/api/conversations/" + encodeURIComponent(conversationId));
-    const stored = data.conversation.messages || [];
-
-    if (!stored.length) return;
-
-    byId("messages").innerHTML = "";
-    chatHistory = [];
-
-    for (const item of stored) {
-      if (item.role === "user") {
-        message("You", item.content, "user");
-      } else {
-        message("Helix", item.content, "assistant", "restored from local conversation");
-      }
-
-      chatHistory.push({ role: item.role, content: item.content });
-    }
-
-    toast("Restored your local conversation.");
+    await loadConversationById(conversationId, false);
   } catch (error) {
     if (String(error.message).includes("Conversation not found")) {
       conversationId = null;
@@ -966,7 +1045,39 @@ function autoGrow() {
 }
 
 byId("status").addEventListener("click", refreshStatus);
-byId("new-chat").addEventListener("click", resetChat);
+byId("new-chat").addEventListener("click", () => {
+  resetChat();
+  refreshConversationList();
+});
+byId("refresh-conversations").addEventListener("click", refreshConversationList);
+
+byId("conversation-list").addEventListener("click", async event => {
+  const open = event.target.closest("[data-conversation-open]");
+  const remove = event.target.closest("[data-conversation-delete]");
+
+  try {
+    if (remove) {
+      const id = remove.dataset.conversationDelete;
+      if (!confirm("Delete this local conversation?")) return;
+
+      await api("/api/conversations/" + encodeURIComponent(id), "DELETE");
+
+      if (conversationId === id) {
+        resetChat();
+      }
+
+      toast("Conversation deleted.");
+      await refreshConversationList();
+      return;
+    }
+
+    if (open) {
+      await loadConversationById(open.dataset.conversationOpen);
+    }
+  } catch (error) {
+    toast("History: " + error.message);
+  }
+});
 byId("theme-toggle").addEventListener("click", toggleTheme);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
@@ -1178,6 +1289,7 @@ byId("chat-form").addEventListener("submit", async event => {
           { role: "assistant", content: result.text }
         ];
         previousRole = result.role;
+        refreshConversationList();
       }
     } catch (error) {
       byId("error").textContent = error.message;
@@ -1240,6 +1352,7 @@ byId("chat-form").addEventListener("submit", async event => {
     ];
 
     previousRole = data.role;
+    refreshConversationList();
     updateRoute(
       data.role,
       data.reason || "Routed by Helix",
@@ -1279,6 +1392,7 @@ byId("chat-form").addEventListener("submit", async event => {
         await loadConversation();
         await refreshMemories();
         await refreshAttachments();
+        await refreshConversationList();
       } catch (error) {
         byId("error").textContent = error.message;
       }
