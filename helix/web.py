@@ -322,7 +322,7 @@ def fetch_web_text(url: str, max_chars: int = 12_000) -> WebDocument:
 
 def research_web(query: str, search_limit: int = 5, fetch_limit: int = 3) -> tuple[list[SearchResult], list[WebDocument]]:
     direct_urls = []
-    for raw in re.findall(r"https?://[^\\s<>()\"']+", query):
+    for raw in re.findall(r"https?://[^\s<>()\"']+", query):
         url = raw.rstrip(".,;:!?)]}")
         if url not in direct_urls:
             direct_urls.append(url)
