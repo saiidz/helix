@@ -2,7 +2,19 @@ from decimal import Decimal
 from datetime import date, timedelta
 import pytest
 from pydantic import ValidationError
-from helix.core import ChatRequest, Profile, Role, Settings, microdollars, policy_preview, select_role
+
+from helix.core import (
+    ChatRequest,
+    Profile,
+    Role,
+    Settings,
+    make_messages,
+    microdollars,
+    policy_preview,
+    reasoning_mode,
+    route_decision,
+    select_role,
+)
 
 
 def request(text, **kwargs):
@@ -10,19 +22,53 @@ def request(text, **kwargs):
 
 
 @pytest.mark.parametrize("text,expected", [
-    ("How is your day?", Role.COMPANION), ("Write Python code",Role.ENGINEER),
-    ("Fix CI",Role.ENGINEER), ("Research this hypothesis",Role.SAGE),
-    ("Prove this theorem",Role.SAGE), ("Explain what happened",Role.COMPANION)])
-def test_router(text,expected):
+    ("How is your day?", Role.COMPANION),
+    ("Write Python code", Role.ENGINEER),
+    ("Fix CI", Role.ENGINEER),
+    ("Research this hypothesis", Role.SAGE),
+    ("Prove this theorem", Role.SAGE),
+    ("Explain what happened", Role.COMPANION),
+    ("Remember that I prefer concise answers", Role.COMPANION),
+    ("Analyze this Python race condition", Role.ENGINEER),
+    ("Compare the evidence for these scientific hypotheses", Role.SAGE),
+])
+def test_router(text, expected):
     assert select_role(request(text))[0] == expected
 
 
 def test_explicit_role_wins():
-    assert select_role(request("Write code",role="sage"))[0] == Role.SAGE
+    decision = route_decision(request("Write code", role="sage"))
+    assert decision.role == Role.SAGE
+    assert decision.confidence == 1.0
 
 
 def test_followup_continuity():
-    assert select_role(request("Why did that fail?",previous_role="engineer"))[0] == Role.ENGINEER
+    decision = route_decision(request("Why did that fail?", previous_role="engineer"))
+    assert decision.role == Role.ENGINEER
+    assert decision.confidence > 0.8
+
+
+def test_router_exposes_scores_and_reason():
+    decision = route_decision(request("Debug this Python API bug"))
+    assert decision.role == Role.ENGINEER
+    assert decision.scores["engineer"] > decision.scores["sage"]
+    assert "engineering" in decision.reason
+
+
+def test_reasoning_mode_is_adaptive():
+    assert reasoning_mode(Role.COMPANION, request("Help me plan my day")) == "fast"
+    assert reasoning_mode(Role.ENGINEER, request("Write a Python helper")) == "fast"
+    assert reasoning_mode(Role.ENGINEER, request("Debug a distributed race condition")) == "deep"
+    assert reasoning_mode(Role.SAGE, request("Research this carefully")) == "deep"
+
+
+def test_capability_prompt_is_truthful_and_specific():
+    messages = make_messages(Role.COMPANION, request("What can you do?"))
+    system = messages[0]["content"]
+    assert "persistent local user memory" in system
+    assert "Internet/web browsing" in system
+    assert "generic chatbot boilerplate" in system
+    assert messages[-1]["content"].startswith("/no_think")
 
 
 def test_three_profiles_required():
@@ -30,7 +76,14 @@ def test_three_profiles_required():
         Settings(profiles=[Profile(role="companion",kind="demo",model_id="demo")]*3)
 
 
-@pytest.mark.parametrize("url", ["http://localhost:11434/v1", "http://169.254.169.254/v1", "http://10.0.0.1/v1", "https://example.com/v1", "http://0.0.0.0:11434/v1", "http://u:p@127.0.0.1/v1"])
+@pytest.mark.parametrize("url", [
+    "http://localhost:11434/v1",
+    "http://169.254.169.254/v1",
+    "http://10.0.0.1/v1",
+    "https://example.com/v1",
+    "http://0.0.0.0:11434/v1",
+    "http://u:p@127.0.0.1/v1",
+])
 def test_local_ssrf_rejected(url):
     with pytest.raises(ValidationError):
         Profile(role="companion",kind="local",model_id="m",base_url=url)
@@ -54,7 +107,8 @@ def test_money_decimal_rounds_up():
     {"messages":[{"role":"user","content":"hi"}],"max_cost_usd":"NaN"},
 ])
 def test_invalid_request(payload):
-    with pytest.raises(ValidationError): ChatRequest(**payload)
+    with pytest.raises(ValidationError):
+        ChatRequest(**payload)
 
 
 @pytest.mark.parametrize("action", ["deploy","send_email","purchase","delete"])
