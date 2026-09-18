@@ -14,10 +14,11 @@ let runtimeFeatures = {
   web: false
 };
 let staleBackendWarningShown = false;
-let webEnabled = false;
 let currentAbortController = null;
 
 const THEME_KEY = "helixTheme";
+const WEB_MODE_KEY = "helixWebMode";
+let webMode = window.localStorage.getItem(WEB_MODE_KEY) || "auto";
 
 function applyTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -43,27 +44,79 @@ function toggleTheme() {
   applyTheme(current === "dark" ? "light" : "dark");
 }
 
-function setWebEnabled(enabled, announce = true) {
-  webEnabled = Boolean(enabled && runtimeFeatures.web);
+function setWebMode(mode, announce = true) {
+  const allowed = new Set(["auto", "on", "off"]);
+  webMode = allowed.has(mode) ? mode : "auto";
+  window.localStorage.setItem(WEB_MODE_KEY, webMode);
+
+  const available = runtimeFeatures.web;
+  const labelText = !available
+    ? "Web Restart"
+    : webMode === "on"
+      ? "Web On"
+      : webMode === "off"
+        ? "Web Off"
+        : "Web Auto";
 
   document.querySelectorAll("[data-web-toggle]").forEach(button => {
-    button.classList.toggle("active", webEnabled);
-    button.setAttribute("aria-pressed", webEnabled ? "true" : "false");
-    button.title = runtimeFeatures.web
-      ? (webEnabled ? "Live web research is on" : "Use live web research for this request")
-      : "Restart Helix to enable the web connector";
+    button.classList.toggle("active", available && webMode === "on");
+    button.classList.toggle("auto", available && webMode === "auto");
+    button.setAttribute("aria-pressed", webMode === "on" ? "true" : "false");
+    button.title = !available
+      ? "Restart Helix to enable the web connector"
+      : webMode === "on"
+        ? "Web mode On: research every request"
+        : webMode === "off"
+          ? "Web mode Off: never use live research"
+          : "Web mode Auto: research current-information requests";
+
+    button.querySelectorAll(".web-toggle-label").forEach(label => {
+      label.textContent = labelText;
+    });
   });
 
   const state = byId("web-cap-state");
   const label = byId("web-cap-label");
-  if (state) state.classList.toggle("live", webEnabled);
-  if (label) label.textContent = runtimeFeatures.web
-    ? (webEnabled ? "On" : "Available")
-    : "Restart";
+
+  if (state) {
+    state.classList.toggle("live", available && webMode !== "off");
+  }
+  if (label) {
+    label.textContent = !available
+      ? "Restart"
+      : webMode === "on"
+        ? "On"
+        : webMode === "off"
+          ? "Off"
+          : "Auto";
+  }
 
   if (announce) {
-    toast(webEnabled ? "Live web research enabled." : "Live web research disabled.");
+    toast(
+      !available
+        ? "Restart Helix to enable web research."
+        : webMode === "on"
+          ? "Web research is on for every request."
+          : webMode === "off"
+            ? "Web research is off."
+            : "Web research is automatic for fresh/current questions."
+    );
   }
+}
+
+function cycleWebMode() {
+  if (!runtimeFeatures.web) {
+    warnStaleBackend();
+    return;
+  }
+
+  const next = webMode === "auto"
+    ? "on"
+    : webMode === "on"
+      ? "off"
+      : "auto";
+
+  setWebMode(next);
 }
 
 function shouldAutoUseWeb(text) {
@@ -688,10 +741,7 @@ async function refreshStatus() {
       web: Boolean(advertised.web)
     };
 
-    if (!runtimeFeatures.web && webEnabled) {
-      webEnabled = false;
-    }
-    setWebEnabled(webEnabled, false);
+    setWebMode(webMode, false);
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -753,13 +803,7 @@ byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
 
 document.querySelectorAll("[data-web-toggle]").forEach(button => {
-  button.addEventListener("click", () => {
-    if (!runtimeFeatures.web) {
-      warnStaleBackend();
-      return;
-    }
-    setWebEnabled(!webEnabled);
-  });
+  button.addEventListener("click", cycleWebMode);
 });
 
 byId("memory-form").addEventListener("submit", async event => {
@@ -891,9 +935,12 @@ byId("chat-form").addEventListener("submit", async event => {
 
   const autoWeb = runtimeFeatures.web && shouldAutoUseWeb(text);
   if (runtimeFeatures.web) {
-    payload.web_enabled = webEnabled || autoWeb;
-    if (autoWeb && !webEnabled) {
-      toast("Helix is using live web research for this current-information request.");
+    payload.web_enabled =
+      webMode === "on" ||
+      (webMode === "auto" && autoWeb);
+
+    if (payload.web_enabled && webMode === "auto") {
+      toast("Helix automatically enabled live web research for this current-information request.");
     }
   }
 
