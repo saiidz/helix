@@ -51,3 +51,14 @@ def test_file_store_caps_context(tmp_path):
     hits = store.retrieve("conversation-1234", "needle attached file", limit=4)
     assert len(hits) <= 4
     assert sum(len(item["excerpt"]) for item in hits) <= 12000
+
+
+def test_clear_conversation_removes_only_that_conversations_files(tmp_path):
+    store = FileStore(tmp_path / "files.sqlite3")
+    store.add("conversation-a", "a.txt", "alpha", "text/plain")
+    store.add("conversation-a", "b.txt", "beta", "text/plain")
+    store.add("conversation-b", "c.txt", "gamma", "text/plain")
+
+    assert store.clear_conversation("conversation-a") == 2
+    assert store.list("conversation-a") == []
+    assert len(store.list("conversation-b")) == 1
