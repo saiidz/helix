@@ -26,6 +26,11 @@ let webMode = window.localStorage.getItem(WEB_MODE_KEY) || "auto";
 let activeProjectId = window.localStorage.getItem(PROJECT_KEY) || null;
 let activeProject = null;
 let taskFilter = "open";
+const TASK_ALERTS_KEY = "helixTaskAlerts";
+let taskAlertsEnabled = window.localStorage.getItem(TASK_ALERTS_KEY) === "true";
+const dueTaskSeen = new Set(
+  JSON.parse(window.sessionStorage.getItem("helixDueTasksSeen") || "[]")
+);
 
 function applyTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -593,6 +598,80 @@ async function refreshTasks() {
       list.innerHTML = '<div class="task-empty">Could not load tasks</div>';
     }
     toast("Tasks: " + error.message);
+  }
+}
+
+function updateTaskAlertButton() {
+  const button = byId("task-alerts");
+  if (!button) return;
+
+  const supported = "Notification" in window;
+  const granted = supported && Notification.permission === "granted";
+  button.classList.toggle("active", taskAlertsEnabled && granted);
+  button.textContent =
+    taskAlertsEnabled && granted
+      ? "Alerts on"
+      : supported && Notification.permission === "denied"
+        ? "Alerts blocked"
+        : "Enable alerts";
+}
+
+async function enableTaskAlerts() {
+  if (!("Notification" in window)) {
+    toast("This browser does not support desktop notifications.");
+    return;
+  }
+
+  let permission = Notification.permission;
+  if (permission === "default") {
+    permission = await Notification.requestPermission();
+  }
+
+  taskAlertsEnabled = permission === "granted";
+  window.localStorage.setItem(TASK_ALERTS_KEY, taskAlertsEnabled ? "true" : "false");
+  updateTaskAlertButton();
+
+  toast(
+    taskAlertsEnabled
+      ? "Task alerts enabled while Helix is open."
+      : "Task alerts were not enabled."
+  );
+}
+
+async function checkDueTasks() {
+  if (!runtimeFeatures.tasks || !byId("key")?.value.trim()) return;
+
+  try {
+    const data = await api("/api/tasks?status=open&limit=100");
+    const now = Date.now();
+
+    for (const task of data.tasks || []) {
+      if (!task.due_at || dueTaskSeen.has(task.id)) continue;
+
+      const due = new Date(task.due_at).getTime();
+      if (Number.isNaN(due) || due > now) continue;
+
+      dueTaskSeen.add(task.id);
+      window.sessionStorage.setItem(
+        "helixDueTasksSeen",
+        JSON.stringify([...dueTaskSeen])
+      );
+
+      toast("Task due: " + task.title);
+
+      if (
+        taskAlertsEnabled &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        new Notification("Helix task due", {
+          body: task.title,
+          tag: "helix-task-" + task.id
+        });
+      }
+    }
+  } catch (_) {
+    // Due checking is best-effort; normal chat/task operations surface their own errors.
   }
 }
 
@@ -1621,6 +1700,7 @@ byId("task-form").addEventListener("submit", async event => {
 
     toast("Task added.");
     await refreshTasks();
+    await checkDueTasks();
   } catch (error) {
     toast("Tasks: " + error.message);
   } finally {
@@ -1637,6 +1717,8 @@ document.querySelectorAll("[data-task-filter]").forEach(button => {
     refreshTasks();
   });
 });
+
+byId("task-alerts").addEventListener("click", enableTaskAlerts);
 
 byId("task-list").addEventListener("click", async event => {
   const button = event.target.closest("[data-task-action]");
@@ -1952,6 +2034,8 @@ byId("chat-form").addEventListener("submit", async event => {
         await refreshConversationList();
         await refreshProjects();
         await refreshTasks();
+        updateTaskAlertButton();
+        await checkDueTasks();
         if (activeProjectId && runtimeFeatures.projects) {
           await loadProject(activeProjectId, false).catch(() => {
             activeProjectId = null;
@@ -1978,6 +2062,8 @@ byId("key").addEventListener("input", () => {
 });
 
 applyTheme(window.localStorage.getItem(THEME_KEY) || "dark");
+updateTaskAlertButton();
+window.setInterval(checkDueTasks, 60000);
 setRole("");
 wireIntentCards();
 autoGrow();
