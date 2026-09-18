@@ -39,6 +39,12 @@ class ChatRequest(StrictModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9_-]+$",
     )
+    project_id: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
     memory_enabled: bool = True
     web_enabled: bool = False
     allow_external: bool = False
