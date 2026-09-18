@@ -495,6 +495,108 @@ def test_project_batch_import(tmp_path):
     assert details["project"]["file_count"] == 2
 
 
+def test_task_api_and_chat_capture(tmp_path,monkeypatch):
+    captured={}
+
+    def fake_complete(profile,messages,max_output):
+        captured["messages"]=messages
+        return Completion("Added to your Helix task list.",10,5)
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    c=client(tmp_path)
+
+    created=c.post(
+        "/api/tasks",
+        headers=HEADERS,
+        json={
+            "title":"Review Helix tests",
+            "details":"Run pytest",
+            "due_at":"2026-09-19T15:00:00Z",
+        },
+    )
+    assert created.status_code == 200, created.text
+    task=created.json()["task"]
+
+    listing=c.get("/api/tasks?status=open",headers=HEADERS)
+    assert listing.status_code == 200
+    assert listing.json()["tasks"][0]["id"] == task["id"]
+
+    done=c.patch(
+        f"/api/tasks/{task['id']}",
+        headers=HEADERS,
+        json={"done":True},
+    )
+    assert done.status_code == 200
+    assert done.json()["task"]["status"] == "done"
+
+    reopened=c.patch(
+        f"/api/tasks/{task['id']}",
+        headers=HEADERS,
+        json={"done":False},
+    )
+    assert reopened.status_code == 200
+
+    chat=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"task-chat-request-001",
+        },
+        json={
+            "messages":[{"role":"user","content":"Add task buy cat food"}],
+        },
+    )
+    assert chat.status_code == 200, chat.text
+    data=chat.json()
+    assert data["task_saved"]["title"] == "buy cat food"
+    assert any(
+        "Helix saved a local task" in message["content"]
+        for message in captured["messages"]
+        if message["role"] == "system"
+    )
+
+    open_tasks=c.get("/api/tasks?status=open",headers=HEADERS).json()["tasks"]
+    assert any(item["title"] == "buy cat food" for item in open_tasks)
+
+    deleted=c.delete(f"/api/tasks/{task['id']}",headers=HEADERS)
+    assert deleted.status_code == 200
+
+
+def test_companion_task_context_is_injected(tmp_path,monkeypatch):
+    captured={}
+
+    def fake_complete(profile,messages,max_output):
+        captured["messages"]=messages
+        return Completion("You have one open task.",10,5)
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    c=client(tmp_path)
+
+    c.post(
+        "/api/tasks",
+        headers=HEADERS,
+        json={"title":"Call the mechanic"},
+    )
+
+    response=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"task-context-00001",
+        },
+        json={
+            "messages":[{"role":"user","content":"What tasks do I have?"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["role"] == "companion"
+    assert any(
+        "Task Context" in message["content"] and "Call the mechanic" in message["content"]
+        for message in captured["messages"]
+        if message["role"] == "system"
+    )
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
@@ -508,4 +610,5 @@ def test_model_endpoint_and_policy(tmp_path):
     assert health["capabilities"]["knowledge_cache"] is True
     assert health["capabilities"]["files"] is True
     assert health["capabilities"]["projects"] is True
+    assert health["capabilities"]["tasks"] is True
     assert "frame-ancestors 'none'" in c.get("/").headers["Content-Security-Policy"]
