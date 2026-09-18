@@ -3,145 +3,164 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Helix · Local</title>
+  <title>Helix · Command Center</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand-row">
-        <div class="brand-mark" aria-hidden="true">H</div>
-        <div>
-          <a class="brand" href="/">Helix</a>
-          <div class="brand-subtitle">local intelligence</div>
+  <div class="shell">
+    <aside class="rail">
+      <div class="identity">
+        <div class="helix-orb" aria-hidden="true"><span></span></div>
+        <div class="identity-copy">
+          <a href="/" class="brand">Helix</a>
+          <small>local command center</small>
         </div>
       </div>
 
-      <button id="new-chat" class="new-chat" type="button">
-        <span aria-hidden="true">＋</span>
-        New chat
+      <button id="new-chat" class="new-task" type="button">
+        <span class="plus">＋</span>
+        <span>New conversation</span>
+        <kbd>Ctrl N</kbd>
       </button>
 
-      <nav class="role-nav" aria-label="Helix specialty">
-        <div class="nav-label">Specialty</div>
-
-        <button class="role-button active" type="button" data-role="">
-          <span class="role-icon">A</span>
-          <span class="role-copy">
-            <strong>Auto</strong>
-            <small>Route by task</small>
-          </span>
-        </button>
-
-        <button class="role-button" type="button" data-role="companion">
-          <span class="role-icon">C</span>
-          <span class="role-copy">
-            <strong>Companion</strong>
-            <small>Conversation & personal help</small>
-          </span>
-        </button>
-
-        <button class="role-button" type="button" data-role="engineer">
-          <span class="role-icon">E</span>
-          <span class="role-copy">
-            <strong>Engineer</strong>
-            <small>Code & technical work</small>
-          </span>
-        </button>
-
-        <button class="role-button" type="button" data-role="sage">
-          <span class="role-icon">S</span>
-          <span class="role-copy">
-            <strong>Sage</strong>
-            <small>Research & deep reasoning</small>
-          </span>
-        </button>
-
-        <select id="role" class="sr-only" aria-label="Specialty">
-          <option value="">Auto</option>
-          <option value="companion">Companion</option>
-          <option value="engineer">Engineer</option>
-          <option value="sage">Sage</option>
-        </select>
+      <nav class="primary-nav" aria-label="Helix navigation">
+        <button class="nav-item active" type="button"><span class="nav-icon">◫</span><span>Chat</span></button>
+        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Projects"><span class="nav-icon">⌘</span><span>Projects</span><em>Soon</em></button>
+        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tasks"><span class="nav-icon">✓</span><span>Tasks</span><em>Soon</em></button>
+        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Memory"><span class="nav-icon">◎</span><span>Memory</span><em>Soon</em></button>
+        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tools"><span class="nav-icon">◇</span><span>Tools</span><em>Soon</em></button>
+        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Voice"><span class="nav-icon">◉</span><span>Voice</span><em>Soon</em></button>
       </nav>
 
-      <div class="sidebar-spacer"></div>
+      <div class="rail-section">
+        <div class="section-label">Brains</div>
+        <button class="brain-choice active" type="button" data-role=""><span class="brain-dot auto"></span><span class="brain-copy"><strong>Auto</strong><small>Helix routes the task</small></span></button>
+        <button class="brain-choice" type="button" data-role="companion"><span class="brain-dot companion"></span><span class="brain-copy"><strong>Companion</strong><small>Life & conversation</small></span></button>
+        <button class="brain-choice" type="button" data-role="engineer"><span class="brain-dot engineer"></span><span class="brain-copy"><strong>Engineer</strong><small>Code & systems</small></span></button>
+        <button class="brain-choice" type="button" data-role="sage"><span class="brain-dot sage"></span><span class="brain-copy"><strong>Sage</strong><small>Research & reasoning</small></span></button>
+        <select id="role" class="sr-only" aria-label="Helix brain">
+          <option value="">Auto</option><option value="companion">Companion</option><option value="engineer">Engineer</option><option value="sage">Sage</option>
+        </select>
+      </div>
 
-      <div class="runtime-card">
-        <div class="runtime-head">
+      <div class="rail-spacer"></div>
+
+      <div class="local-card">
+        <div class="local-card-head">
           <span id="runtime-dot" class="status-dot"></span>
-          <span id="runtime-label">Local runtime</span>
+          <div><strong id="runtime-label">Local runtime</strong><small id="runtime-short">Checking…</small></div>
         </div>
-        <div id="connection" class="runtime-detail" aria-live="polite">Checking connection…</div>
-        <button id="status" class="text-button" type="button">Refresh status</button>
+        <button id="status" type="button">Refresh</button>
       </div>
 
       <details class="settings">
-        <summary>Local settings</summary>
-
-        <label for="key">Access key</label>
+        <summary>Runtime settings</summary>
+        <label for="key">Local access key</label>
         <input id="key" type="password" autocomplete="off" placeholder="Local key">
-
         <label for="budget">Max model cost / request</label>
-        <select id="budget">
-          <option value="0.02">$0.02</option>
-          <option value="0.05">$0.05</option>
-          <option value="0.10" selected>$0.10</option>
-        </select>
-
-        <div class="privacy-note">
-          <strong>Private by default</strong>
-          <p>Cloud fallback, browsing, email, calendar, terminal and deployment tools are disabled.</p>
-        </div>
+        <select id="budget"><option value="0.02">$0.02</option><option value="0.05">$0.05</option><option value="0.10" selected>$0.10</option></select>
       </details>
     </aside>
 
-    <main class="main-pane">
-      <header class="topbar">
-        <div class="topbar-left">
-          <strong>Local session</strong>
-          <span id="role-chip" class="chip">Auto</span>
-        </div>
-        <div class="topbar-right">
-          <span class="local-pill"><span class="mini-dot"></span> Local only</span>
+    <main class="workspace">
+      <header class="workspace-bar">
+        <div class="workspace-title"><span class="crumb">Helix</span><span class="slash">/</span><strong>Local workspace</strong></div>
+        <div class="workspace-actions">
+          <span class="secure-pill"><i></i> Local only</span>
+          <button class="ghost-control" type="button" disabled title="Voice is not connected yet">Voice</button>
+          <button class="ghost-control" type="button" disabled title="Web access is not connected yet">Web</button>
         </div>
       </header>
 
-      <section class="conversation" aria-label="Conversation">
+      <section class="chat-stage">
         <div id="messages" class="messages" aria-live="polite">
           <div id="welcome" class="welcome">
-            <div class="welcome-mark">H</div>
-            <h1>What do you want to work on?</h1>
-            <p>One interface for everyday help, coding, and deeper reasoning. Helix keeps the active model visible and stays local by default.</p>
+            <div class="hero-orb" aria-hidden="true"><div class="hero-ring ring-a"></div><div class="hero-ring ring-b"></div><div class="hero-core">H</div></div>
+            <div class="eyebrow">YOUR UNIVERSAL AI · LOCAL FIRST</div>
+            <h1>What should Helix handle?</h1>
+            <p class="welcome-copy">Ask naturally. Helix chooses Companion, Engineer, or Sage, keeps the route visible, and only uses capabilities you have actually connected.</p>
 
-            <div class="quick-prompts" aria-label="Suggested prompts">
-              <button type="button" data-prompt="Help me plan what I should work on today.">Plan my day</button>
-              <button type="button" data-prompt="Review this code with me and help me improve it.">Work on code</button>
-              <button type="button" data-prompt="Think deeply about a hard problem with me.">Reason deeply</button>
+            <div class="intent-grid">
+              <button type="button" class="intent-card" data-role-prompt="companion" data-prompt="Help me organize what I need to do today and prioritize it.">
+                <span class="intent-icon companion">C</span><span><strong>Run my day</strong><small>Plan, organize, explain, remember context</small></span><b>→</b>
+              </button>
+              <button type="button" class="intent-card" data-role-prompt="engineer" data-prompt="Help me work on my software project. Start by asking what I want to build or fix.">
+                <span class="intent-icon engineer">E</span><span><strong>Build something</strong><small>Code, debug, architecture, systems</small></span><b>→</b>
+              </button>
+              <button type="button" class="intent-card" data-role-prompt="sage" data-prompt="Help me reason deeply about a difficult problem.">
+                <span class="intent-icon sage">S</span><span><strong>Think deeply</strong><small>Research, compare, reason, verify</small></span><b>→</b>
+              </button>
+            </div>
+
+            <div class="vision-strip">
+              <div><span class="vision-dot live"></span><strong>Local AI</strong><small>Connected</small></div>
+              <div><span class="vision-dot"></span><strong>Long-term memory</strong><small>Next</small></div>
+              <div><span class="vision-dot"></span><strong>Internet</strong><small>Next</small></div>
+              <div><span class="vision-dot"></span><strong>Voice</strong><small>Planned</small></div>
+              <div><span class="vision-dot"></span><strong>Actions</strong><small>Planned</small></div>
             </div>
           </div>
         </div>
 
-        <div class="composer-wrap">
+        <div class="composer-zone">
           <form id="chat-form" class="composer">
+            <div class="composer-topline"><span id="composer-mode"><span class="brain-dot auto"></span> Auto route</span><span id="thinking-mode">Fast by default</span></div>
             <label class="sr-only" for="prompt">Your message</label>
-            <textarea id="prompt" rows="1" maxlength="12000" required placeholder="Message Helix…"></textarea>
-
-            <div class="composer-bottom">
-              <div class="composer-meta">
-                <span id="composer-role">Auto routing</span>
-                <span class="shortcut">Enter to send · Shift+Enter for newline</span>
+            <textarea id="prompt" rows="1" maxlength="12000" required placeholder="Ask Helix anything…"></textarea>
+            <div class="composer-controls">
+              <div class="left-tools">
+                <button class="tool-button" type="button" disabled title="File attachment is coming next">＋</button>
+                <button class="capability-button" type="button" disabled><span></span> Files</button>
+                <button class="capability-button" type="button" disabled><span></span> Web</button>
               </div>
-              <button id="send" type="submit" aria-label="Send message">Send</button>
+              <div class="send-zone"><span class="shortcut">Enter ↵</span><button id="send" type="submit">Send</button></div>
             </div>
           </form>
-
           <div id="error" role="alert"></div>
-          <div class="footer-note">Local model output can be wrong. Helix shows which specialty handled each response.</div>
+          <div class="local-footnote">Private by default · External inference disabled · Model responses may be wrong</div>
         </div>
       </section>
     </main>
+
+    <aside class="intel">
+      <div class="intel-head"><div><span class="section-label">Live intelligence</span><h2>Helix state</h2></div><span id="route-badge" class="route-badge">AUTO</span></div>
+
+      <section class="intel-section route-section">
+        <div class="intel-section-title">Router</div>
+        <div class="route-visual">
+          <div class="route-source">You</div><div class="route-line"></div>
+          <div id="route-target" class="route-target auto"><span class="brain-dot auto"></span><div><strong>Auto</strong><small>Waiting for a task</small></div></div>
+        </div>
+      </section>
+
+      <section class="intel-section">
+        <div class="intel-section-title">Runtime</div>
+        <dl class="facts">
+          <div><dt>Model</dt><dd id="model-name">—</dd></div>
+          <div><dt>Provider</dt><dd id="provider-mode">Local</dd></div>
+          <div><dt>Monthly model cost</dt><dd id="runtime-cost">$0.000000</dd></div>
+        </dl>
+      </section>
+
+      <section class="intel-section">
+        <div class="intel-section-title">Capabilities</div>
+        <div class="capability-list">
+          <div><span class="cap-state live"></span><strong>Local inference</strong><em>Ready</em></div>
+          <div><span class="cap-state"></span><strong>Persistent memory</strong><em>Session only</em></div>
+          <div><span class="cap-state"></span><strong>Internet</strong><em>Off</em></div>
+          <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
+          <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
+        </div>
+      </section>
+
+      <section class="intel-section safety">
+        <div class="intel-section-title">Boundary</div>
+        <p>Helix can only use capabilities shown as active. It will not claim browsing, memory, terminal access, email, or actions that are not connected.</p>
+      </section>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
 </body>
 </html>
