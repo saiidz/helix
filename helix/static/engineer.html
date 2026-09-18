@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HELIX · Engineer workbench</title>
+  <link rel="stylesheet" href="/static/engineer.css">
+  <script type="module" src="/static/engineer.js"></script>
+</head>
+<body>
+<header><a href="/" class="brand">HELIX <span>/ Engineer</span></a><button id="theme" type="button">Light mode</button></header>
+<main>
+  <section class="intro"><p class="eyebrow">LOCAL ENGINEER WORKBENCH · PREVIEW</p><h1>Read. Understand. Review. Save.</h1>
+    <p>Choose your files and skills. HELIX drafts code; you approve each save. No shell, automatic deployment, or paid-model fallback.</p></section>
+  <details class="access"><summary>Local connection</summary><label for="key">HELIX access key from your running terminal</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Kept in this tab only">
+    <p>The key and selected files are not saved in browser storage. Requests go only to this HELIX instance, with cloud and web disabled.</p></details>
+  <div class="layout">
+    <aside class="panel">
+      <h2>01 / Files</h2><p>Only files you select. Refreshing this tab releases its handles.</p>
+      <div class="actions"><button id="open" type="button" data-control>Open files</button><button id="folder" type="button" data-control>Open folder</button><button id="new" type="button" data-control>New file</button></div>
+      <input id="file-input" type="file" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
+      <label for="files">Selected text and code</label><select id="files" size="8" data-control aria-label="Selected files"></select>
+      <p id="file-status">No files selected. PDFs, Office files, and images are not supported here.</p>
+      <h2>02 / Skills</h2><p>Enable only the workflows needed for this request. Imported instructions never grant permissions.</p>
+      <div id="skills"></div><button id="import-skill" type="button" data-control>Import SKILL.md</button><input id="skill-input" type="file" accept=".md" hidden>
+      <details><summary>Review enabled skill instructions</summary><pre id="skill-preview">No skills enabled.</pre></details>
+      <button id="clear" class="subtle" type="button" data-control>Clear files and imported skills</button>
+    </aside>
+    <section class="panel work">
+      <h2>03 / Task</h2><label for="path">Target file</label><input id="path" placeholder="example.py" data-control readonly maxlength="500">
+      <details open><summary id="source-title">Original source</summary><pre id="source">Open a text/code file or create a new draft.</pre></details>
+      <label for="instruction">What should HELIX do?</label><textarea id="instruction" rows="4" maxlength="2000" data-control placeholder="Find the bug, explain this file, or propose a small improvement."></textarea>
+      <div class="actions"><button id="analyze" type="button" data-control>Analyze</button><button id="draft" type="button" class="primary" data-control>Draft change</button><button id="stop" type="button" disabled>Stop</button></div>
+      <p class="hint">Analysis uses up to 10,000 characters of one selected file. Safe drafts require a complete file of at most 6,000 characters. Maximum three enabled skills. Model output remains unverified.</p>
+      <p id="status" role="status" aria-live="polite">Ready. No file changes have been made.</p>
+      <h2>04 / Review</h2><pre id="answer">The answer or proposed change will appear here.</pre>
+      <div id="proposal" hidden><p id="summary"></p><details open><summary>Changed lines · − original / + draft</summary><pre id="diff"></pre></details>
+        <details><summary>Complete proposed file</summary><pre id="after"></pre></details>
+        <label class="check"><input id="approve" type="checkbox">I reviewed this exact change and approve saving it.</label>
+        <div class="actions"><button id="apply" type="button" class="primary" disabled>Apply to selected file</button><button id="download" type="button">Download proposed file</button><button id="backup" type="button">Download original backup</button></div>
+      </div>
+      <button id="restore" type="button" hidden>Restore original file</button>
+      <p class="hint">Apply is available only for handles from a supported browser's file/folder picker. Otherwise download and review the file yourself. Saves check for changes since the file was read, but are not an operating-system transaction or an automatic test run.</p>
+    </section>
+  </div>
+</main>
+</body></html>
