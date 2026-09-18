@@ -6,9 +6,12 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
 
-from .web import SearchResult, WebDocument
+from .freshness import cache_metadata, requires_live_evidence
+
+if TYPE_CHECKING:
+    from .web import SearchResult, WebDocument
 
 
 def utc_now() -> str:
@@ -25,7 +28,7 @@ def _tokens(text: str) -> set[str]:
 
 
 class KnowledgeStore:
-    """SQLite-backed cache of web knowledge with source provenance."""
+    """SQLite-backed research cache; never a model-training or freshness claim."""
 
     def __init__(self, path: Path):
         self.path = path
@@ -64,17 +67,32 @@ class KnowledgeStore:
         docs = {doc.url: doc for doc in documents}
         now = utc_now()
         learned = 0
-
         with self.connect() as c:
             for result in results[:8]:
                 doc = docs.get(result.url)
-                content = (doc.text if doc and doc.text else result.snippet).strip()
+                is_page = bool(doc and doc.text.strip())
+                content = (doc.text if is_page else result.snippet).strip()
                 if not content:
                     continue
-
-                title = (doc.title if doc and doc.title else result.title).strip() or result.url
+                title = (doc.title if is_page and doc.title else result.title).strip() or result.url
                 content = content[:12000]
-
+                source_type = "page" if is_page else "snippet"
+                previous = c.execute(
+                    "SELECT content,title,source_type FROM web_knowledge WHERE url=?",
+                    (result.url,),
+                ).fetchone()
+                # A failed page fetch must not overwrite stronger evidence with a
+                # search snippet or renew the old page's retrieval timestamp.
+                if previous and previous["source_type"] == "page" and not is_page:
+                    continue
+                # The web adapter has a five-minute cache without fetch timestamps.
+                # Do not pretend an identical cached result was freshly verified.
+                # Conservatively keep its original date even if a real fetch was
+                # identical. A future timestamped adapter can prove revalidation.
+                if previous and all((previous["content"] == content,
+                                     previous["title"] == title[:300],
+                                     previous["source_type"] == source_type)):
+                    continue
                 c.execute(
                     """INSERT INTO web_knowledge
                        (url,title,content,query,source_type,created_at,updated_at,last_used_at)
@@ -85,82 +103,57 @@ class KnowledgeStore:
                          query=excluded.query,
                          source_type=excluded.source_type,
                          updated_at=excluded.updated_at""",
-                    (
-                        result.url,
-                        title[:300],
-                        content,
-                        query[:500],
-                        "web",
-                        now,
-                        now,
-                    ),
+                    (result.url, title[:300], content, query[:500], source_type, now, now),
                 )
                 learned += 1
-
         return learned
 
     def retrieve(self, query: str, limit: int = 4) -> list[dict]:
+        if requires_live_evidence(query) or limit <= 0:
+            return []
         query_tokens = _tokens(query)
         if not query_tokens:
             return []
-
         with self.connect() as c:
             rows = c.execute(
-                """SELECT url,title,content,query,updated_at,last_used_at
-                   FROM web_knowledge
-                   ORDER BY updated_at DESC
-                   LIMIT 250"""
+                """SELECT url,title,content,query,source_type,updated_at,last_used_at
+                   FROM web_knowledge ORDER BY updated_at DESC LIMIT 250"""
             ).fetchall()
-
-        scored: list[tuple[int, sqlite3.Row]] = []
+        now = datetime.now(timezone.utc)
+        scored: list[tuple[int, dict]] = []
         for row in rows:
-            corpus_tokens = _tokens(
-                f"{row['title']} {row['query']} {row['content'][:4000]}"
-            )
+            metadata = cache_metadata(row["updated_at"], row["source_type"], now)
+            if metadata["cache_status"] != "eligible":
+                continue
+            corpus_tokens = _tokens(f"{row['title']} {row['query']} {row['content'][:4000]}")
             overlap = len(query_tokens & corpus_tokens)
             if overlap:
-                scored.append((overlap, row))
-
-        selected = [
-            row for _, row in sorted(
-                scored,
-                key=lambda item: (item[0], item[1]["updated_at"]),
-                reverse=True,
-            )[: max(1, min(limit, 8))]
-        ]
-
+                item = dict(row)
+                item.update(metadata)
+                scored.append((overlap, item))
+        selected = [item for _, item in sorted(
+            scored, key=lambda pair: (pair[0], pair[1]["updated_at"]), reverse=True,
+        )[:min(limit, 8)]]
         if selected:
-            now = utc_now()
-            urls = [row["url"] for row in selected]
+            urls = [item["url"] for item in selected]
             placeholders = ",".join("?" for _ in urls)
             with self.connect() as c:
                 c.execute(
                     f"UPDATE web_knowledge SET last_used_at=? WHERE url IN ({placeholders})",
-                    (now, *urls),
+                    (utc_now(), *urls),
                 )
-
-        return [
-            {
-                "url": row["url"],
-                "title": row["title"],
-                "content": row["content"],
-                "query": row["query"],
-                "updated_at": row["updated_at"],
-            }
-            for row in selected
-        ]
+        return selected
 
     def list_entries(self, limit: int = 100) -> list[dict]:
         limit = max(1, min(limit, 500))
         with self.connect() as c:
             rows = c.execute(
-                """SELECT url,title,query,created_at,updated_at,last_used_at
-                   FROM web_knowledge
-                   ORDER BY updated_at DESC
-                   LIMIT ?""",
-                (limit,),
+                """SELECT url,title,query,source_type,created_at,updated_at,last_used_at
+                   FROM web_knowledge ORDER BY updated_at DESC LIMIT ?""", (limit,),
             ).fetchall()
-        return [dict(row) for row in rows]
+        now = datetime.now(timezone.utc)
+        return [dict(row, **cache_metadata(row["updated_at"], row["source_type"], now))
+                for row in rows]
 
     def clear(self) -> int:
         with self.connect() as c:
