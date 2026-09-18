@@ -326,16 +326,26 @@ function pendingMessage(role) {
   return box;
 }
 
-function updateRoute(role, reason = "") {
+function updateRoute(role, reason = "", confidence = null, mode = "") {
   const actualRole = role || "";
   const target = byId("route-target");
   const name = roleName(actualRole);
+
+  let detail = reason || (actualRole ? "Selected explicitly" : "Waiting for a task");
+
+  if (typeof confidence === "number") {
+    detail += " · " + Math.round(confidence * 100) + "%";
+  }
+
+  if (mode) {
+    detail += " · " + mode;
+  }
 
   target.className = "route-target " + roleClass(actualRole);
   target.innerHTML =
     '<span class="brain-dot ' + roleClass(actualRole) + '"></span>' +
     "<div><strong>" + name + "</strong><small>" +
-    (reason || (actualRole ? "Selected explicitly" : "Waiting for a task")) +
+    detail +
     "</small></div>";
 
   byId("route-badge").textContent = name.toUpperCase();
@@ -609,7 +619,12 @@ byId("chat-form").addEventListener("submit", async event => {
     ];
 
     previousRole = data.role;
-    updateRoute(data.role, data.reason || "Routed by Helix");
+    updateRoute(
+      data.role,
+      data.reason || "Routed by Helix",
+      data.routing_confidence,
+      data.reasoning_mode
+    );
   } catch (error) {
     pending.remove();
     byId("error").textContent = error.message;
