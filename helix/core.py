@@ -126,12 +126,14 @@ class Settings(StrictModel):
 
 HELIX_CAPABILITY_CONTEXT = (
     "Current Helix runtime facts: local text inference is connected when the provider mode is local; "
-    "persistent local user memory and conversation history are available. Helix can receive live web research "
-    "context only when a Web Research system message is present for the current request; otherwise do not claim "
-    "that the internet was searched or that facts are current. Local text/code attachments are available only when "
-    "an Attached File Context system message is present; this does not grant arbitrary filesystem access. Email, "
-    "calendar, voice, terminal access, repository mutation, deployment, purchases, and other external actions are "
-    "NOT connected in this build. Never claim those unavailable capabilities are available. "
+    "persistent local user memory and conversation history are available. A local task list is available only "
+    "when Task Context is supplied; it does not provide background notifications or calendar scheduling yet. "
+    "Helix can receive live web research context only when a Web Research system message is present for the current "
+    "request; otherwise do not claim that the internet was searched or that facts are current. Local text/code "
+    "attachments are available only when an Attached File Context system message is present; this does not grant "
+    "arbitrary filesystem access. Email, calendar, voice, terminal access, repository mutation, deployment, "
+    "purchases, and other external actions are NOT connected in this build. Never claim those unavailable "
+    "capabilities are available. "
     "Never invent a training-data cutoff or say your knowledge is current to a specific date unless Helix "
     "explicitly supplies that fact. If the user asks what Helix can do, what it cannot do, or how to improve it, "
     "answer about these actual Helix capabilities and the concrete engineering path forward instead of giving "
@@ -193,7 +195,7 @@ SAGE_PATTERNS: tuple[tuple[str, int], ...] = (
 
 COMPANION_PATTERNS: tuple[tuple[str, int], ...] = (
     (r"\b(remember|memory|my preference|i prefer|i like|i dislike|about me)\b", 4),
-    (r"\b(plan my day|my schedule|organize my day|personal assistant|remind me)\b", 4),
+    (r"\b(plan my day|my schedule|organize my day|personal assistant|remind me|task|tasks|todo|to-do|task list|add task)\b", 4),
     (r"\b(write a message|draft a message|help me reply|conversation|talk to me)\b", 2),
     (r"\b(how old am i|what do you remember|who am i|my birthday|my name)\b", 4),
 )
