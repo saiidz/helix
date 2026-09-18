@@ -2,7 +2,7 @@
 
 ## Objective
 
-Validate the new local memory/conversation layer on the founder Windows PC, then add **streaming responses and cancellation** without introducing paid inference or cloud dependencies.
+Validate the new memory + scored-routing intelligence layer on the founder Windows PC, then add **streaming responses and cancellation** without introducing paid inference or cloud dependencies.
 
 ## Current inputs already known
 
@@ -21,6 +21,7 @@ Validate the new local memory/conversation layer on the founder Windows PC, then
    ```powershell
    & ".\.venv\Scripts\python.exe" -m pytest -q
    & ".\.venv\Scripts\python.exe" -m compileall -q helix tests tools
+   & ".\.venv\Scripts\python.exe" tools\intelligence_eval.py
    ```
 3. Start llama.cpp and Helix.
 4. In the UI, add a memory manually and verify it appears.
@@ -28,7 +29,8 @@ Validate the new local memory/conversation layer on the founder Windows PC, then
 6. Tell Helix: `Remember that my birthday is September 14.`
 7. Start another relevant turn and confirm Helix can retrieve that stored fact.
 8. Reload the browser and confirm the current conversation restores.
-9. Check `git status` for secrets/runtime files before any merge.
+9. Try several ambiguous prompts and confirm the route panel shows a sensible role, confidence, and fast/deep mode.
+10. Check `git status` for secrets/runtime files before any merge.
 
 ## Next implementation after validation
 
