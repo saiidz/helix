@@ -43,7 +43,7 @@ function toggleTheme() {
   applyTheme(current === "dark" ? "light" : "dark");
 }
 
-function setWebEnabled(enabled) {
+function setWebEnabled(enabled, announce = true) {
   webEnabled = Boolean(enabled && runtimeFeatures.web);
 
   document.querySelectorAll("[data-web-toggle]").forEach(button => {
@@ -61,7 +61,13 @@ function setWebEnabled(enabled) {
     ? (webEnabled ? "On" : "Available")
     : "Restart";
 
-  toast(webEnabled ? "Live web research enabled." : "Live web research disabled.");
+  if (announce) {
+    toast(webEnabled ? "Live web research enabled." : "Live web research disabled.");
+  }
+}
+
+function shouldAutoUseWeb(text) {
+  return /\b(latest|today|current|currently|recent|recently|news|live|right now|this week|this month|search the web|search online|look up|internet|online|2026)\b/i.test(text);
 }
 
 const roleName = role => {
@@ -338,7 +344,7 @@ function renderRichText(container, text) {
   }
 }
 
-function appendSources(box, sources) {
+function appendSources(box, sources, headingText = "Web sources", prefix = "") {
   if (!Array.isArray(sources) || !sources.length) return;
 
   const wrap = document.createElement("div");
@@ -346,22 +352,23 @@ function appendSources(box, sources) {
 
   const heading = document.createElement("div");
   heading.className = "sources-title";
-  heading.textContent = "Web sources";
+  heading.textContent = headingText;
   wrap.append(heading);
 
-  for (const source of sources) {
+  sources.forEach((source, index) => {
     const link = document.createElement("a");
     link.href = source.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = "[" + source.index + "] " + source.title;
+    const label = source.index || (index + 1);
+    link.textContent = "[" + prefix + label + "] " + source.title;
     wrap.append(link);
-  }
+  });
 
   box.append(wrap);
 }
 
-function message(label, text, type, meta = "", sources = []) {
+function message(label, text, type, meta = "", sources = [], knowledge = []) {
   removeWelcome();
 
   const box = document.createElement("div");
@@ -391,7 +398,8 @@ function message(label, text, type, meta = "", sources = []) {
     box.append(tag);
   }
 
-  appendSources(box, sources);
+  appendSources(box, sources, "Live web sources");
+  appendSources(box, knowledge, "Learned knowledge", "K");
   byId("messages").append(box);
   box.scrollIntoView({ block: "end", behavior: "smooth" });
   return box;
@@ -437,7 +445,7 @@ function streamingMessage(role) {
   byId("messages").append(box);
   box.scrollIntoView({ block: "end", behavior: "smooth" });
 
-  return { box, title, body, meta, text: "", sources: [] };
+  return { box, title, body, meta, text: "", sources: [], knowledge: [] };
 }
 
 function setGenerationState(active) {
@@ -511,6 +519,10 @@ async function streamChat(payload, selectedRole) {
             event.reasoning_mode
           );
           live.sources = event.web_sources || [];
+          live.knowledge = event.knowledge_used || [];
+          if (event.knowledge_learned) {
+            toast("Helix learned " + event.knowledge_learned + " sourced web item(s) locally.");
+          }
           if (event.web_error) toast("Web: " + event.web_error);
           if (event.memory_saved) {
             toast("Helix saved that to your private local memory.");
@@ -544,7 +556,8 @@ async function streamChat(payload, selectedRole) {
       (live.sources.length ? " · web grounded" : "") +
       " · unverified";
 
-    appendSources(live.box, live.sources);
+    appendSources(live.box, live.sources, "Live web sources");
+    appendSources(live.box, live.knowledge, "Learned knowledge", "K");
 
     return {
       text: live.text,
@@ -631,7 +644,7 @@ function welcomeMarkup() {
     '<div class="vision-strip">',
     '<div><span class="vision-dot live"></span><strong>Local AI</strong><small>Connected</small></div>',
     '<div><span class="vision-dot live"></span><strong>Long-term memory</strong><small>Connected</small></div>',
-    '<div><span class="vision-dot"></span><strong>Internet</strong><small>Next</small></div>',
+    '<div><span class="vision-dot live"></span><strong>Internet</strong><small>Auto + opt-in</small></div>',
     '<div><span class="vision-dot"></span><strong>Voice</strong><small>Planned</small></div>',
     '<div><span class="vision-dot"></span><strong>Actions</strong><small>Planned</small></div>',
     "</div>",
@@ -678,7 +691,7 @@ async function refreshStatus() {
     if (!runtimeFeatures.web && webEnabled) {
       webEnabled = false;
     }
-    setWebEnabled(webEnabled);
+    setWebEnabled(webEnabled, false);
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -876,8 +889,12 @@ byId("chat-form").addEventListener("submit", async event => {
     payload.memory_enabled = true;
   }
 
+  const autoWeb = runtimeFeatures.web && shouldAutoUseWeb(text);
   if (runtimeFeatures.web) {
-    payload.web_enabled = webEnabled;
+    payload.web_enabled = webEnabled || autoWeb;
+    if (autoWeb && !webEnabled) {
+      toast("Helix is using live web research for this current-information request.");
+    }
   }
 
   message("You", text, "user");
@@ -929,8 +946,13 @@ byId("chat-form").addEventListener("submit", async event => {
           ? " · web grounded"
           : "") +
         " · unverified",
-      data.web_sources || []
+      data.web_sources || [],
+      data.knowledge_used || []
     );
+
+    if (data.knowledge_learned) {
+      toast("Helix learned " + data.knowledge_learned + " sourced web item(s) locally.");
+    }
 
     if (data.web_error) {
       toast("Web: " + data.web_error);
