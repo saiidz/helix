@@ -110,12 +110,15 @@
         <div class="composer-zone">
           <form id="chat-form" class="composer">
             <div class="composer-topline"><span id="composer-mode"><span class="brain-dot auto"></span> Auto route</span><span id="thinking-mode">Fast by default</span></div>
+            <div id="file-chips" class="file-chips" aria-live="polite"></div>
             <label class="sr-only" for="prompt">Your message</label>
             <textarea id="prompt" rows="1" maxlength="12000" required placeholder="Ask Helix anything…"></textarea>
             <div class="composer-controls">
               <div class="left-tools">
-                <button class="tool-button" type="button" disabled title="File attachment is coming next">＋</button>
-                <button class="capability-button" type="button" disabled><span></span> Files</button>
+                <button class="tool-button" type="button" data-file-picker title="Attach text or code files">＋</button>
+                <button class="capability-button" type="button" data-file-picker><span></span> Files</button>
+                <input id="file-input" class="sr-only" type="file" multiple
+                  accept=".txt,.md,.markdown,.json,.yaml,.yml,.toml,.ini,.cfg,.csv,.tsv,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.java,.c,.h,.cpp,.hpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.kts,.sql,.sh,.ps1,.bat,.cmd,.html,.css,.scss,.xml,text/*,application/json,application/xml,application/javascript">
                 <button class="capability-button web-toggle" type="button" data-web-toggle aria-pressed="false"><span></span><span class="web-toggle-label">Web Auto</span></button>
               </div>
               <div class="send-zone"><span class="shortcut">Enter ↵</span><button id="send" type="submit">Send</button></div>
@@ -153,6 +156,7 @@
           <div><span class="cap-state live"></span><strong>Local inference</strong><em>Ready</em></div>
           <div><span class="cap-state live"></span><strong>Persistent memory</strong><em>Ready</em></div>
           <div><span id="web-cap-state" class="cap-state live"></span><strong>Internet</strong><em id="web-cap-label">Auto</em></div>
+          <div><span id="file-cap-state" class="cap-state live"></span><strong>Files</strong><em id="file-cap-label">Ready</em></div>
           <div><span class="cap-state live"></span><strong>Learned knowledge</strong><em id="knowledge-cap-label">0 sourced</em></div>
           <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
           <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
