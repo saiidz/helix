@@ -161,6 +161,17 @@ def create_app(
             "mode": "founder_prototype",
             "models_loaded_by_this_app": 0,
             "memory": "local_sqlite",
+            "capabilities": {
+                "persistent_memory": True,
+                "persistent_conversations": True,
+                "routing_scores": True,
+                "adaptive_reasoning": True,
+                "streaming": False,
+                "web": False,
+                "files": False,
+                "voice": False,
+                "tools": False,
+            },
         }
 
     @app.get("/api/models", dependencies=[Depends(auth)])
