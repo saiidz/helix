@@ -27,7 +27,7 @@
       <nav class="primary-nav" aria-label="Helix navigation">
         <button class="nav-item active" type="button"><span class="nav-icon">◫</span><span>Chat</span></button>
         <button id="projects-nav" class="nav-item" type="button"><span class="nav-icon">⌘</span><span>Projects</span><em>Ready</em></button>
-        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tasks"><span class="nav-icon">✓</span><span>Tasks</span><em>Soon</em></button>
+        <button id="tasks-nav" class="nav-item" type="button"><span class="nav-icon">✓</span><span>Tasks</span><em>Ready</em></button>
         <button id="memory-nav" class="nav-item" type="button"><span class="nav-icon">◎</span><span>Memory</span><em>Ready</em></button>
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tools"><span class="nav-icon">◇</span><span>Tools</span><em>Soon</em></button>
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Voice"><span class="nav-icon">◉</span><span>Voice</span><em>Soon</em></button>
@@ -170,6 +170,7 @@
           <div><span id="web-cap-state" class="cap-state live"></span><strong>Internet</strong><em id="web-cap-label">Auto</em></div>
           <div><span id="file-cap-state" class="cap-state live"></span><strong>Files</strong><em id="file-cap-label">Ready</em></div>
           <div><span id="project-cap-state" class="cap-state live"></span><strong>Projects</strong><em id="project-cap-label">Ready</em></div>
+          <div><span id="task-cap-state" class="cap-state live"></span><strong>Tasks</strong><em id="task-cap-label">Ready</em></div>
           <div><span class="cap-state live"></span><strong>Learned knowledge</strong><em id="knowledge-cap-label">0 sourced</em></div>
           <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
           <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
@@ -181,6 +182,37 @@
         <p>Helix only uses connected capabilities. Web research runs in Auto or On mode and returns source links; terminal, email, voice, and external actions remain disconnected.</p>
       </section>
     </aside>
+
+    <aside id="tasks-drawer" class="tasks-drawer" hidden>
+      <div class="tasks-drawer-head">
+        <div>
+          <span class="section-label">Local personal assistant</span>
+          <h2>Tasks</h2>
+        </div>
+        <button id="tasks-close" class="drawer-close" type="button" aria-label="Close tasks">×</button>
+      </div>
+
+      <p class="tasks-intro">Helix can keep a local task list and use it in Companion planning. Background notifications and calendar reminders are not connected yet.</p>
+
+      <form id="task-form" class="task-form">
+        <input id="task-title" type="text" maxlength="300" placeholder="What needs to get done?" required>
+        <textarea id="task-details" rows="2" maxlength="4000" placeholder="Optional details"></textarea>
+        <div class="task-form-row">
+          <input id="task-due" type="datetime-local" aria-label="Due time">
+          <button id="task-create" type="submit">Add task</button>
+        </div>
+      </form>
+
+      <div class="task-filter-row">
+        <button class="task-filter active" type="button" data-task-filter="open">Open</button>
+        <button class="task-filter" type="button" data-task-filter="done">Done</button>
+        <button class="task-filter" type="button" data-task-filter="all">All</button>
+      </div>
+
+      <div id="task-list" class="task-list"></div>
+    </aside>
+
+    <div id="tasks-backdrop" class="memory-backdrop" hidden></div>
 
     <aside id="projects-drawer" class="projects-drawer" hidden>
       <div class="projects-drawer-head">
