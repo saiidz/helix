@@ -23,7 +23,8 @@ from .core import (
     make_messages,
     microdollars,
     policy_preview,
-    select_role,
+    reasoning_mode,
+    route_decision,
 )
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
@@ -105,7 +106,10 @@ def create_app(
         return "\n".join(lines)
 
     def resolve(req: ChatRequest):
-        role, reason = select_role(req)
+        decision = route_decision(req)
+        role = decision.role
+        reason = decision.reason
+        mode = reasoning_mode(role, req)
         profile = settings.profile(role)
 
         if profile.kind == "cloud":
@@ -143,7 +147,7 @@ def create_app(
         if estimate > limit:
             raise HTTPException(402, "Task estimate exceeds the spending limit")
 
-        return role, reason, profile, messages, inputs, estimate, memory_hits
+        return role, reason, profile, messages, inputs, estimate, memory_hits, decision, mode
 
     @app.get("/")
     def index():
@@ -225,7 +229,7 @@ def create_app(
 
     @app.post("/api/route", dependencies=[Depends(auth)])
     def route(req: ChatRequest):
-        role, reason, profile, _, inputs, amount, memory_hits = resolve(req)
+        role, reason, profile, _, inputs, amount, memory_hits, decision, mode = resolve(req)
         return {
             "role": role,
             "reason": reason,
@@ -237,6 +241,9 @@ def create_app(
             "estimate_method": "conservative bytes plus framing; not an exact tokenizer",
             "provider_called": False,
             "memory_matches": len(memory_hits),
+            "routing_confidence": decision.confidence,
+            "routing_scores": decision.scores,
+            "reasoning_mode": mode,
         }
 
     @app.post("/api/chat", dependencies=[Depends(auth)])
@@ -248,7 +255,7 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
-        role, reason, profile, messages, _, estimate, memory_hits = resolve(req)
+        role, reason, profile, messages, _, estimate, memory_hits, decision, mode = resolve(req)
         fingerprint = hmac.new(
             api_key.encode(),
             req.model_dump_json().encode(),
@@ -315,6 +322,9 @@ def create_app(
                 "text": result.text,
                 "role": role,
                 "reason": reason,
+                "routing_confidence": decision.confidence,
+                "routing_scores": decision.scores,
+                "reasoning_mode": mode,
                 "model_id": profile.model_id,
                 "provider_mode": profile.kind,
                 "model_cost_usd": (estimate if actual is None else actual) / 1000000,
