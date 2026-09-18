@@ -175,6 +175,15 @@ class TaskStore:
             if match:
                 title = match.group(1).strip(" .")
                 if title:
+                    with self.connect() as c:
+                        existing = c.execute(
+                            """SELECT * FROM tasks
+                               WHERE status='open' AND lower(title)=lower(?)
+                               ORDER BY updated_at DESC LIMIT 1""",
+                            (title,),
+                        ).fetchone()
+                    if existing:
+                        return self._row(existing)
                     return self.add(title, source="explicit_chat")
 
         return None
