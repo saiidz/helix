@@ -463,6 +463,38 @@ def test_project_rejects_binary_extension(tmp_path):
     assert response.status_code == 422
 
 
+def test_project_batch_import(tmp_path):
+    c=client(tmp_path)
+    project=c.post(
+        "/api/projects",
+        headers=HEADERS,
+        json={"name":"Batch project"},
+    ).json()["project"]
+
+    response=c.post(
+        f"/api/projects/{project['id']}/files/batch",
+        headers=HEADERS,
+        json={
+            "files":[
+                {"path":"src/a.py","content":"A_VALUE = 1\n"},
+                {"path":"src/b.ts","content":"export const b = 2;\n"},
+                {"path":"assets/logo.png","content":"not accepted"},
+            ]
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    data=response.json()
+    assert len(data["added"]) == 2
+    assert len(data["skipped"]) == 1
+
+    details=c.get(
+        f"/api/projects/{project['id']}",
+        headers=HEADERS,
+    ).json()
+    assert details["project"]["file_count"] == 2
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
