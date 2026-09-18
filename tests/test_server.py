@@ -177,9 +177,70 @@ def test_web_grounding_injected_when_enabled(tmp_path,monkeypatch):
     data=response.json()
     assert data["web_enabled"] is True
     assert data["web_sources"][0]["url"] == "https://example.com/current"
+    assert data["knowledge_learned"] == 1
     assert any(
         "Web Research for this request" in message["content"]
         for message in captured["messages"]
+        if message["role"] == "system"
+    )
+
+
+
+
+def test_cached_web_knowledge_is_reused_without_new_web_call(tmp_path,monkeypatch):
+    captured=[]
+
+    def fake_complete(profile,messages,max_output):
+        captured.append(messages)
+        return Completion("cached answer",10,5)
+
+    def fake_research(query,search_limit=5,fetch_limit=2):
+        return (
+            [SearchResult("Cached source","https://example.com/cache","persistent sourced knowledge")],
+            [WebDocument("Cached source","https://example.com/cache","persistent sourced knowledge for Helix")],
+        )
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    monkeypatch.setattr("helix.server.research_web",fake_research)
+    c=client(tmp_path)
+
+    first=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"knowledge-learn-0001",
+        },
+        json={
+            "messages":[{"role":"user","content":"Research persistent sourced knowledge"}],
+            "web_enabled":True,
+        },
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["knowledge_learned"] == 1
+
+    def should_not_search(*args,**kwargs):
+        raise AssertionError("cached knowledge query should not require web when web is off")
+
+    monkeypatch.setattr("helix.server.research_web",should_not_search)
+
+    second=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"knowledge-use-00001",
+        },
+        json={
+            "messages":[{"role":"user","content":"What do we know about persistent sourced knowledge?"}],
+            "web_enabled":False,
+        },
+    )
+    assert second.status_code == 200, second.text
+    data=second.json()
+    assert data["knowledge_used"]
+    assert data["knowledge_used"][0]["url"] == "https://example.com/cache"
+    assert any(
+        "Local Knowledge Cache" in message["content"]
+        for message in captured[-1]
         if message["role"] == "system"
     )
 
@@ -194,4 +255,5 @@ def test_model_endpoint_and_policy(tmp_path):
     assert health["capabilities"]["routing_scores"] is True
     assert health["capabilities"]["streaming"] is True
     assert health["capabilities"]["web"] is True
+    assert health["capabilities"]["knowledge_cache"] is True
     assert "frame-ancestors 'none'" in c.get("/").headers["Content-Security-Policy"]
