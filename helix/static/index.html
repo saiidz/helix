@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -68,6 +68,10 @@
         <div class="workspace-title"><span class="crumb">Helix</span><span class="slash">/</span><strong>Local workspace</strong></div>
         <div class="workspace-actions">
           <span class="secure-pill"><i></i> Local only</span>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch color theme" aria-pressed="false">
+            <span id="theme-icon" aria-hidden="true">☼</span>
+            <span id="theme-label">Light</span>
+          </button>
           <button class="ghost-control" type="button" disabled title="Voice is not connected yet">Voice</button>
           <button class="ghost-control" type="button" disabled title="Web access is not connected yet">Web</button>
         </div>
