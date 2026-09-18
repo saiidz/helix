@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HELIX · Engineer Agent</title><link rel="stylesheet" href="/static/agent.css"></head>
+<body><header><div><a href="/">HELIX</a><span> / ENGINEER AGENT</span></div><button id="theme" type="button">Light mode</button></header>
+<main><section class="intro"><p class="eyebrow">LOCAL REPOSITORY · REVIEWED ACTIONS</p><h1>Inspect. Fix. Verify.</h1>
+<p>Give HELIX a task. Review the exact file changes and commands before they run.</p></section>
+<section class="panel"><h2>Connection</h2><div class="row"><label for="key">Local access key</label><input type="password" id="key" autocomplete="off" placeholder="Paste the key printed by HELIX"><button id="connect" type="button">Connect</button></div>
+<p id="connection" role="status">Connect to see the workspace selected when HELIX started. Your key stays in this tab.</p></section>
+<section class="warning"><strong>Command execution is not sandboxed.</strong> Approved programs can access your files, network and Windows account permissions. Run HELIX as a standard user—not Administrator. Mouse/desktop control is not connected.</section>
+<section class="panel"><label for="task"><h2>What should HELIX work on?</h2></label><textarea id="task" rows="4" maxlength="6000" placeholder="Find why the tests fail, propose the smallest fix, then run the relevant tests."></textarea>
+<label for="skills">Optional repository skills</label><input id="skills" placeholder="debugging, code-review (names under .agents/skills)">
+<div class="row actions"><button id="start" type="button" disabled>Start task</button><button id="stop" type="button" disabled>Stop</button><span id="status" role="status">Not connected</span></div></section>
+<section id="approval" class="panel approval" hidden><p class="eyebrow">YOUR APPROVAL IS REQUIRED</p><h2 id="approval-title">Review action</h2><pre id="preview"></pre>
+<p id="approval-warning">Check the complete proposed action. Denying it will not make any changes.</p><div class="row"><button id="approve" type="button">Approve exact action</button><button id="deny" type="button">Deny</button></div></section>
+<section class="panel"><div class="row"><h2>Activity &amp; evidence</h2><span>Model summaries are not test evidence.</span></div><div id="log" aria-live="polite"><p class="empty">File reads, proposed changes, approval requests and real command results appear here.</p></div></section>
+<p class="footer">Recovery copies and action receipts are saved under your home directory’s .helix/engineer-history. Filename exclusions are not a secret scanner. This preview does not automatically push, merge or deploy.</p></main>
+<script src="/static/agent.js" defer></script></body></html>
