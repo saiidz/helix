@@ -1,0 +1,17 @@
+{
+  "pytest_passed": 76,
+  "dom_fixture_passed": 8,
+  "dom_checks": [
+    "DOM initialization and mocked connection",
+    "edit remains pending before approval in UI fixture",
+    "dark and light DOM layouts",
+    "390px mobile layout without horizontal overflow",
+    "separate command warning and approval presentation",
+    "deny command UI fixture",
+    "model output rendered as inert text",
+    "no uncaught JavaScript errors"
+  ],
+  "javascript_errors": [],
+  "browser_http_navigation": "blocked: net::ERR_BLOCKED_BY_ADMINISTRATOR; no policy changed",
+  "scope": "Targeted Linux tests; real filesystem/subprocess and authenticated ASGI router tests; deterministic model fixtures. DOM test uses simulated fetch and inline assets, not live HTTP/CSP. Full existing app, Windows and live model remain unverified."
+}
