@@ -533,6 +533,8 @@ def create_app(
             mode,
             web_sources,
             web_error,
+            knowledge_hits,
+            knowledge_learned,
         ) = resolve(req)
 
         fingerprint = hmac.new(
