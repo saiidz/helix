@@ -150,6 +150,24 @@ class KnowledgeStore:
             for row in selected
         ]
 
+    def list_entries(self, limit: int = 100) -> list[dict]:
+        limit = max(1, min(limit, 500))
+        with self.connect() as c:
+            rows = c.execute(
+                """SELECT url,title,query,created_at,updated_at,last_used_at
+                   FROM web_knowledge
+                   ORDER BY updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def clear(self) -> int:
+        with self.connect() as c:
+            count = int(c.execute("SELECT COUNT(*) FROM web_knowledge").fetchone()[0])
+            c.execute("DELETE FROM web_knowledge")
+        return count
+
     def count(self) -> int:
         with self.connect() as c:
             return int(c.execute("SELECT COUNT(*) FROM web_knowledge").fetchone()[0])
