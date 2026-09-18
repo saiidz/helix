@@ -1,0 +1,11 @@
+{
+  "profiles": [
+    {"role": "companion", "kind": "local", "model_id": "REPLACE_WITH_YOUR_INSTALLED_CHAT_MODEL", "base_url": "http://127.0.0.1:11434/v1", "context_tokens": 16384, "input_usd_per_million": "0.20", "output_usd_per_million": "1.00"},
+    {"role": "engineer", "kind": "local", "model_id": "REPLACE_WITH_YOUR_INSTALLED_CODE_MODEL", "base_url": "http://127.0.0.1:11434/v1", "context_tokens": 16384, "input_usd_per_million": "0.40", "output_usd_per_million": "2.00"},
+    {"role": "sage", "kind": "local", "model_id": "REPLACE_WITH_YOUR_INSTALLED_REASONING_MODEL", "base_url": "http://127.0.0.1:11434/v1", "context_tokens": 16384, "input_usd_per_million": "0.80", "output_usd_per_million": "4.00"}
+  ],
+  "allow_external": false,
+  "approved_cloud_hosts": [],
+  "monthly_budget_usd": "10",
+  "task_budget_usd": "0.10"
+}

@@ -1,0 +1,7 @@
+# Exact versions available and exercised in the build environment.
+# Not a complete supply-chain lock or a claim these are the newest releases.
+fastapi==0.128.2
+pydantic==2.13.4
+starlette==0.50.0
+httpx==0.28.1
+uvicorn==0.48.0

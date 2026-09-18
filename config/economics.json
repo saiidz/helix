@@ -1,0 +1,35 @@
+{
+  "as_of": "2026-09-17",
+  "currency": "USD",
+  "disclaimer": "Illustrative operating scenarios, not forecasts, investment advice, or permission to spend. Replace all assumptions with measured cohorts and quotes.",
+  "card_percent": 0.029,
+  "card_fixed": 0.30,
+  "billing_percent": 0.007,
+  "refund_fraction": 0.02,
+  "initial_capital": 10000,
+  "minimum_cash_reserve": 1000,
+  "setup_expense": 1000,
+  "founder_compensation_monthly": 3000,
+  "other_opex_monthly": 200,
+  "service_fixed_monthly": 100,
+  "service_fixed_per_1000_active": 100,
+  "additional_staff_per_1000_active": 3000,
+  "profit_tax_reserve_fraction": 0.20,
+  "plans": [
+    {"name": "Personal", "price": 9, "mix": 0.6, "model_tools": 1.2, "voice": 0.45, "storage": 0.15, "direct_support": 0.2},
+    {"name": "Plus", "price": 19, "mix": 0.3, "model_tools": 2.5, "voice": 1.0, "storage": 0.25, "direct_support": 0.4},
+    {"name": "Pro", "price": 39, "mix": 0.1, "model_tools": 6.0, "voice": 2.0, "storage": 0.4, "direct_support": 0.8}
+  ],
+  "scenarios": [
+    {"name": "Conservative", "new_paid_per_month_by_year": [10, 20, 30], "monthly_churn": 0.08, "cac_per_new_paid": 30},
+    {"name": "Base", "new_paid_per_month_by_year": [30, 80, 150], "monthly_churn": 0.05, "cac_per_new_paid": 20},
+    {"name": "Upside", "new_paid_per_month_by_year": [50, 150, 300], "monthly_churn": 0.03, "cac_per_new_paid": 15}
+  ],
+  "gpu_sensitivity": {
+    "assumed_full_instance_hourly": 0.81,
+    "price_status": "Unverified EC2 planning input, NOT a current price quote",
+    "busy_aggregate_output_tokens_per_second": 200,
+    "utilizations": [0.10, 0.25, 0.50, 0.75],
+    "exclusions": "Prefill, model loading, network, storage, retries, operations; throughput is hypothetical, not a benchmark"
+  }
+}

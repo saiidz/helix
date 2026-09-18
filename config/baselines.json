@@ -1,0 +1,18 @@
+{
+  "as_of": "2026-09-17",
+  "status": "No comparative model runs performed",
+  "rule": "Comparator entries are not extra resident Helix models. Resolve/pin API IDs and versions before each evaluation. No provider is enabled by this registry.",
+  "candidates": [
+    {"family":"OpenAI", "display":"GPT-6 Astra / Codex", "reference_id":"gpt-6-astra", "status":"reference documented; not run", "training_eligible":false, "enabled":false, "source":"https://developers.openai.com/api/docs/models/gpt-6-astra"},
+    {"family":"Anthropic", "display":"Claude Sonnet 5, Opus 5, Fable 5.1 / Claude Code", "reference_id":null, "status":"pricing names verified; pin exact API revisions before evaluation", "training_eligible":false, "enabled":false, "source":"https://platform.claude.com/docs/en/about-claude/pricing"},
+    {"family":"xAI", "display":"Grok 4.6 / Voice", "reference_id":"grok-4.6", "status":"text reference documented; voice API is a separate evaluation", "training_eligible":false, "enabled":false, "source":"https://docs.x.ai/developers/models/grok-4.6"},
+    {"family":"Google", "display":"Gemini Pro / Flash / Live", "reference_id":"gemini-3.8-flash", "status":"Flash pricing reference documented; resolve other endpoint revisions", "training_eligible":false, "enabled":false, "source":"https://ai.google.dev/gemini-api/docs/pricing"},
+    {"family":"Qwen", "display":"Qwen3.5-9B and Qwen3-Coder-30B-A3B-Instruct", "reference_id":null, "status":"candidate cards reviewed; pin revisions, runtime and licenses before use", "training_eligible":false, "enabled":false, "source":"https://huggingface.co/Qwen"},
+    {"family":"DeepSeek", "display":"Current relevant reasoning/coding releases", "reference_id":null, "status":"release and exact license verification required", "training_eligible":false, "enabled":false},
+    {"family":"Z.ai / GLM", "display":"Current relevant GLM releases", "reference_id":null, "status":"release and exact license verification required", "training_eligible":false, "enabled":false},
+    {"family":"Moonshot / Kimi", "display":"Current relevant Kimi releases", "reference_id":null, "status":"release and exact license verification required", "training_eligible":false, "enabled":false},
+    {"family":"MiniMax", "display":"Current relevant coding/agent releases", "reference_id":null, "status":"release and exact license verification required", "training_eligible":false, "enabled":false},
+    {"family":"Mistral", "display":"Current Devstral release", "reference_id":null, "status":"resolve exact release, license and local serving requirements", "training_eligible":false, "enabled":false},
+    {"family":"OpenAI open weights", "display":"gpt-oss-20b", "reference_id":"openai/gpt-oss-20b", "status":"reasoning foundation candidate; not installed or run", "training_eligible":false, "enabled":false, "source":"https://openai.com/index/introducing-gpt-oss/"}
+  ]
+}

@@ -1,0 +1,39 @@
+# Local environments and runtime state
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.helix/
+*.sqlite3*
+*.sqlite
+*.db
+
+# Secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+config/local.json
+config/private*.json
+*.pem
+*.key
+*.pfx
+*.p12
+credentials*.json
+secrets*.json
+
+# Model weights, downloads and private training material
+models/
+datasets/
+private-data/
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

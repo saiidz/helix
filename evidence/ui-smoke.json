@@ -1,0 +1,7 @@
+{
+  "status": "blocked_by_environment",
+  "reason": "System Chromium returned net::ERR_BLOCKED_BY_ADMINISTRATOR for the loopback URL. Browser policy was not modified.",
+  "live_browser_integration_passed": false,
+  "real_model_used": false,
+  "note": "HTTP endpoint and local-provider fixture tests passed separately. Static offline preview is not end-to-end browser evidence."
+}

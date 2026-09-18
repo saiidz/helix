@@ -1,0 +1,8 @@
+{
+  "kind": "offline static rendering only",
+  "javascript_actions_tested": false,
+  "checks": [
+    "Desktop static layout: no horizontal overflow",
+    "Mobile 390px static layout: no horizontal overflow"
+  ]
+}

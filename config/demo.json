@@ -1,0 +1,11 @@
+{
+  "profiles": [
+    {"role": "companion", "kind": "demo", "model_id": "demo-not-a-model"},
+    {"role": "engineer", "kind": "demo", "model_id": "demo-not-a-model"},
+    {"role": "sage", "kind": "demo", "model_id": "demo-not-a-model"}
+  ],
+  "allow_external": false,
+  "approved_cloud_hosts": [],
+  "monthly_budget_usd": "10",
+  "task_budget_usd": "0.10"
+}

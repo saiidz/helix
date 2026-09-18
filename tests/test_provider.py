@@ -1,0 +1,36 @@
+import json
+import threading
+from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+from helix.core import Profile
+from helix.providers import complete,count
+
+
+def test_loopback_transport_contract():
+    captured=[]
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*args): pass
+        def do_POST(self):
+            captured.append((self.path,json.loads(self.rfile.read(int(self.headers["Content-Length"])))) )
+            result={"choices":[{"message":{"content":"local transport test response"}}],"usage":{"prompt_tokens":12,"completion_tokens":7}}
+            blob=json.dumps(result).encode()
+            self.send_response(200);self.send_header("Content-Type","application/json")
+            self.send_header("Content-Length",str(len(blob)));self.end_headers();self.wfile.write(blob)
+    server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        profile=Profile(role="engineer",kind="local",model_id="fixture-not-real-model",base_url=f"http://127.0.0.1:{server.server_port}/v1")
+        result=complete(profile,[{"role":"user","content":"hello"}],128)
+        assert result.text == "local transport test response"
+        assert result.input_tokens == 12 and result.output_tokens == 7
+        assert captured[0][0] == "/v1/chat/completions"
+        assert captured[0][1]["max_tokens"] == 128
+        assert "tools" not in captured[0][1]
+    finally:
+        server.shutdown();server.server_close();thread.join(timeout=2)
+
+
+def test_invalid_usage_rejected():
+    assert count(-1) is None
+    assert count(True) is None
+    assert count("100") is None
+    assert count(0)==0

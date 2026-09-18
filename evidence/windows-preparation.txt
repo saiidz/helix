@@ -1,0 +1,21 @@
+Windows preparation validation
+Platform actually exercised: Linux; Python 3.13.5
+Windows .cmd execution: NOT TESTED on Windows
+Real AI model: NOT INSTALLED / NOT TESTED
+GitHub changes: NONE
+Cloud resources / paid inference: NONE
+
+python -m pytest:
+.......................................................                  [100%]
+55 passed in 1.74s
+
+python -m compileall -q helix tools tests: PASS
+
+git check-ignore in a disposable local repository: PASS
+.venv/example.txt
+.helix/ledger.sqlite3
+.env
+config/local.json
+credentials-service.json
+models/model.gguf
+key.pem

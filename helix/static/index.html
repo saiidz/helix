@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Helix · Foundation</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/">helix<span> / foundation</span></a><span class="badge">LOCAL PROTOTYPE · v0.1</span></header>
+<main>
+<section class="intro"><div class="eyebrow">ONE INTERFACE. THREE SPECIALTIES.</div><h1>Useful intelligence.<br>Clear boundaries.</h1><p>Talk to Companion, build with Engineer, or reason with Sage. Start locally and see exactly which profile handles your request.</p></section>
+<section class="roles" aria-label="Helix specialties"><article><b>01 / Companion</b><p>Conversation & personal assistance</p></article><article><b>02 / Engineer</b><p>Programming & technical work</p></article><article><b>03 / Sage</b><p>Research & careful reasoning</p></article></section>
+<section class="workspace">
+<aside>
+<h2>Session settings</h2><label for="key">Local access key</label><input id="key" type="password" autocomplete="off" placeholder="Paste the key from your terminal"><p class="note">Kept in this page's memory only. Never paste a provider API key here.</p>
+<label for="role">Specialty</label><select id="role"><option value="">Auto · starter rules</option value="companion">Companion</option><option value="engineer">Engineer</option><option value="sage">Sage</option></select>
+<label for="budget">Maximum model cost / request</label><select id="budget"><option value="0.02">$0.02</option><option value="0.05">$0.05</option><option value="0.10" selected>$0.10</option></select>
+<button id="status" class="secondary">Check connection & costs</button><div id="connection" class="note" aria-live="polite">No model connected yet.</div>
+<div class="boundary"><strong>Private by default</strong><p>Cloud requests are disabled in this interface. No email, calendar, browsing, terminal or deployment tools are connected.</p></div>
+</aside>
+<section class="chat" aria-label="Conversation"><div id="messages" aria-live="polite"><div class="message system"><b>Start here</b><p>The included demo tests routing only; it is not an AI model. Connect your local model in the configuration to generate real answers.</p></div></div>
+<form id="chat-form"><label class="sr-only" for="prompt">Your message</label><textarea id="prompt" rows="3" maxlength="12000" required placeholder="Ask a question, describe a bug, or explore an idea…"></textarea><div class="composer-bottom"><span>Session history clears on reload.</span><button id="send" type="submit">Send request →</button></div></form><div id="error" role="alert"></div>
+</section></section>
+<footer>Built to measure, not overclaim. Model output is unverified. No trained Helix weights are included.</footer>
+</main></body></html>

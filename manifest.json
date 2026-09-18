@@ -1,0 +1,258 @@
+{
+  "distribution": "Helix Windows Starter",
+  "application_version": "0.1.0",
+  "windows_launchers_executed": false,
+  "python_tests_passed": 55,
+  "files": [
+    {
+      "path": ".gitignore",
+      "size": 465,
+      "sha256": "b0e2f160110d38e5abec5d6c11d4a488feb16a27bc0786b035d70e42908e56e4"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 1889,
+      "sha256": "6bbf463ecddd824bd5bfcc0dc75518c7666d5842c0da286cf195044918086a9b"
+    },
+    {
+      "path": "CHECK_PC.cmd",
+      "size": 1216,
+      "sha256": "7ac3d27086366b55abe55f69df21a42d6e610846ae40fd3f3d439548e8e76b73"
+    },
+    {
+      "path": "CLAUDE.md",
+      "size": 309,
+      "sha256": "1fd2abfb3b8ce444ef6a0892a1d7639bf521804a5035828a5d80fbaded2d1bca"
+    },
+    {
+      "path": "HELIX_ROADMAP.md",
+      "size": 27866,
+      "sha256": "02a886b33d110a42756791900b4551e3cda2c27e7fd515f3bd996ddbb512ba4f"
+    },
+    {
+      "path": "NEXT_TASK.md",
+      "size": 2023,
+      "sha256": "f6d52567b61acc28154cc7b36e179f3c5da7b8f371ab147e1137cec34bc665bf"
+    },
+    {
+      "path": "README.md",
+      "size": 5408,
+      "sha256": "98bcfe89bef3a5faff9baf91812a30f71473a9c366bed986c803217f3aff91d5"
+    },
+    {
+      "path": "SETUP_WINDOWS.cmd",
+      "size": 1733,
+      "sha256": "e85f9d981a78a8f3d74ee7db54299159a53bafb7dc664012c154c4652c54b28b"
+    },
+    {
+      "path": "START_HELIX.cmd",
+      "size": 633,
+      "sha256": "37e060ffb1f594f8f7b12d094d7560fbfe6e2ea30b0e39e64d9466c5a23c771a"
+    },
+    {
+      "path": "STATUS.md",
+      "size": 4016,
+      "sha256": "bbe8bd4e8439cec2f833f6bf61b5ac817930033e8c852467aea0438597b67e34"
+    },
+    {
+      "path": "config/baselines.json",
+      "size": 2901,
+      "sha256": "6d9dc24f401d5e481c6f4985fc73131ed2ab20097a841417ed0ebe43e0cbccbc"
+    },
+    {
+      "path": "config/demo.json",
+      "size": 358,
+      "sha256": "8621285289d445fdb1ab67e14fe2d49ae4c44cfb0f20150e210e8b9cfd0840cf"
+    },
+    {
+      "path": "config/economics.json",
+      "size": 1759,
+      "sha256": "e20ad82a47238e2c0fdc841525155f51bf8de950bd6933ac064dad0f1520bb93"
+    },
+    {
+      "path": "config/local.example.json",
+      "size": 831,
+      "sha256": "168156a61bcb81e9ef77743633fa529ffe1a6f9ec565ffef31d94ddb2fd5b9b1"
+    },
+    {
+      "path": "docs/ECONOMICS.md",
+      "size": 6770,
+      "sha256": "620791d1766fdf604b193dcd9a566971757c10e3ebd7e140cafe307b47eebd31"
+    },
+    {
+      "path": "docs/EVALUATIONS.md",
+      "size": 3860,
+      "sha256": "47b6fd7983334eb42e5b95324ad851ebddff505e4aa826a5d9a6aa9e493911d9"
+    },
+    {
+      "path": "docs/RESEARCH_NOTES.md",
+      "size": 3229,
+      "sha256": "bd6d3eddf8756568e24466987f2dcb8489bb9d0dc510ec603891548512cf4dc5"
+    },
+    {
+      "path": "docs/RUNBOOK.md",
+      "size": 1996,
+      "sha256": "a8bdee72fcde2746f29be96e159a8acbef88abf0b83648dda270939a5f448a21"
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "size": 3421,
+      "sha256": "af854072efc11c67cdede2a809c0b9b3ebdfc0c6a713360cdf10d755d44f7181"
+    },
+    {
+      "path": "docs/SOURCES.md",
+      "size": 7489,
+      "sha256": "db4c13dec5880becc98724ea1e9a8252e6a47be1300b73f506bbaff75c5a5544"
+    },
+    {
+      "path": "docs/WINDOWS_SETUP.md",
+      "size": 6166,
+      "sha256": "687fdbf6535e8627946a932fe71d75d3f542bd1367318a12d13b84c5ec000e76"
+    },
+    {
+      "path": "evidence/economics-results.json",
+      "size": 93393,
+      "sha256": "a4007981bbd92de85754c2aba3c85f3db7d3101ec4deb397bf6e9a20ec7fc87e"
+    },
+    {
+      "path": "evidence/tests-final.txt",
+      "size": 99,
+      "sha256": "2dafcb4c7ffc8678e40bcc2732f373fbb4093380585fed520646ff146b081d8f"
+    },
+    {
+      "path": "evidence/tests-initial.txt",
+      "size": 99,
+      "sha256": "4fa194fe35746341c444e663a85ff26f57236de9564db00b10aa3ab62aa48ff6"
+    },
+    {
+      "path": "evidence/ui-desktop.png",
+      "size": 106320,
+      "sha256": "02ba29256e39473e92663e25a1e2a268f12a2c8ffda8d3233a49fdb2f559a48b"
+    },
+    {
+      "path": "evidence/ui-mobile.png",
+      "size": 86536,
+      "sha256": "12faa9399bd1f49bd7869d822810b69b971f333167fcfb7193e1a7bc115f7635"
+    },
+    {
+      "path": "evidence/ui-preview.json",
+      "size": 213,
+      "sha256": "960f04b4b7fdbf04f02d8c0b1e0ebc2bfebb45ef30de4f11be422e596c9855b7"
+    },
+    {
+      "path": "evidence/ui-smoke.json",
+      "size": 380,
+      "sha256": "7a44a2e55fd5b2416ca5d94db3268cc3c6a73413298d46f7e7e23399b3ce210a"
+    },
+    {
+      "path": "evidence/windows-preparation.txt",
+      "size": 567,
+      "sha256": "22690b48eed0bbe2f45b550669c1a205afb3cb7ce8783a533329d133f42d12af"
+    },
+    {
+      "path": "helix/__init__.py",
+      "size": 90,
+      "sha256": "e1e34327be970923d7d0fb534359a3eb9a335636699c1ecb6763dc636f1efd27"
+    },
+    {
+      "path": "helix/__main__.py",
+      "size": 1154,
+      "sha256": "04ddd70cba33a3aed92cecdbdfd0bb6f5beb456a69e7fe86a26a31fe25015352"
+    },
+    {
+      "path": "helix/core.py",
+      "size": 7677,
+      "sha256": "82b4ce21c338d5801991a8813df5167763ec9d9f6ebb6d73944fde0381ffb9d8"
+    },
+    {
+      "path": "helix/ledger.py",
+      "size": 4249,
+      "sha256": "7d1b5e7623fde2074c981b3986d62d31de22702911ee57184f8674527487738d"
+    },
+    {
+      "path": "helix/providers.py",
+      "size": 2825,
+      "sha256": "3f789a15dd1933672a739becca0ae873731269a2f33d8a252690a169a2466744"
+    },
+    {
+      "path": "helix/server.py",
+      "size": 7193,
+      "sha256": "639e827626f304a749c82ce788078e78c3d8d8515543add1e74fa92b5b5ff1dc"
+    },
+    {
+      "path": "helix/static/app.js",
+      "size": 2772,
+      "sha256": "0b4a4ee55f689a67a9f8c5626eb87bc4819be845f2a2f5b218ce917a2de934c1"
+    },
+    {
+      "path": "helix/static/index.html",
+      "size": 2876,
+      "sha256": "f5ef85bfd4f5b8876533710968c1c595588511aa062297e4cce7cda2b62ce6d8"
+    },
+    {
+      "path": "helix/static/style.css",
+      "size": 3463,
+      "sha256": "94d98930ebbc02bbf5143b78363483c329f03dc10a1238d635115a20ee3def5a"
+    },
+    {
+      "path": "infra/aws/README.md",
+      "size": 2409,
+      "sha256": "75efec2d6a3d6b13fe72c710685d5eff00d576548f0dd798b21b36daca8203da"
+    },
+    {
+      "path": "pyproject.toml",
+      "size": 207,
+      "sha256": "f8bd6ed68d4b52911cd822d2857c00d1a251d5fcbc8d4b221b2d6273369e5c75"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "size": 34,
+      "sha256": "ebc319f05921f7d8d196fb93e7e47ffabc2cdda3dbd7e261d76a8fbc5ea099c8"
+    },
+    {
+      "path": "requirements.txt",
+      "size": 226,
+      "sha256": "026dbf03b174b1f14ad0ee3ac8cab65d8c0ed1deeaa1157abfb2f63578294329"
+    },
+    {
+      "path": "tests/test_core.py",
+      "size": 2680,
+      "sha256": "62896cb968fcda99587c5dbdade86a4d0b6d16b35be765473b2bea5fe0627bca"
+    },
+    {
+      "path": "tests/test_economics.py",
+      "size": 2087,
+      "sha256": "3c5dfd51d702aad85bb2b41b3efe9b4bbb789c069da0de07bd7be9978f7c4cbd"
+    },
+    {
+      "path": "tests/test_ledger.py",
+      "size": 2057,
+      "sha256": "ddbec755db8b6db1a6f6e8f0bfcef622d152be3a275822abcff37a4ad24861c8"
+    },
+    {
+      "path": "tests/test_provider.py",
+      "size": 1708,
+      "sha256": "1bd76309ab6c71c0f5adfcda18d0f8ee775af9f831713c48c53cb1631f51e43c"
+    },
+    {
+      "path": "tests/test_server.py",
+      "size": 4628,
+      "sha256": "3c187e1a11280c710a09f8cc8a7960298f6329ea3bc7ca7aec3fde1bb30ebe3a"
+    },
+    {
+      "path": "tools/economics.py",
+      "size": 15392,
+      "sha256": "7af6bf9305a669d188d7c3ba9a67f74dde9e3b6fe14dc2a8b421454eadf6d3cc"
+    },
+    {
+      "path": "tools/ui_preview.py",
+      "size": 1563,
+      "sha256": "0847222c962d49fe9c28bdf889b851023066416c303717c62ee75afffbac5829"
+    },
+    {
+      "path": "tools/ui_smoke.py",
+      "size": 4427,
+      "sha256": "aaab8f225f8f038464c3e3c3b475f9c7493fdddeb2f1d9a6b0557245543beb8e"
+    }
+  ]
+}
