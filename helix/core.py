@@ -40,6 +40,7 @@ class ChatRequest(StrictModel):
         pattern=r"^[A-Za-z0-9_-]+$",
     )
     memory_enabled: bool = True
+    web_enabled: bool = False
     allow_external: bool = False
     max_output_tokens: int = Field(default=512, ge=1, le=2048)
     max_cost_usd: Decimal = Field(default=Decimal("0.10"), ge=0, le=10)
@@ -119,9 +120,11 @@ class Settings(StrictModel):
 
 HELIX_CAPABILITY_CONTEXT = (
     "Current Helix runtime facts: local text inference is connected when the provider mode is local; "
-    "persistent local user memory and conversation history are available. Internet/web browsing, live news, "
-    "email, calendar, voice, file ingestion, terminal access, repository mutation, deployment, purchases, "
-    "and other external actions are NOT connected in this build. Never claim those capabilities are available. "
+    "persistent local user memory and conversation history are available. Helix can receive live web research "
+    "context only when a Web Research system message is present for the current request; otherwise do not claim "
+    "that the internet was searched or that facts are current. Email, calendar, voice, file ingestion, terminal "
+    "access, repository mutation, deployment, purchases, and other external actions are NOT connected in this build. "
+    "Never claim those unavailable capabilities are available. "
     "Never invent a training-data cutoff or say your knowledge is current to a specific date unless Helix "
     "explicitly supplies that fact. If the user asks what Helix can do, what it cannot do, or how to improve it, "
     "answer about these actual Helix capabilities and the concrete engineering path forward instead of giving "
