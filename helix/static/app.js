@@ -12,14 +12,18 @@ let runtimeFeatures = {
   adaptive_reasoning: false,
   streaming: false,
   web: false,
-  files: false
+  files: false,
+  projects: false
 };
 let staleBackendWarningShown = false;
 let currentAbortController = null;
 
 const THEME_KEY = "helixTheme";
 const WEB_MODE_KEY = "helixWebMode";
+const PROJECT_KEY = "helixProjectId";
 let webMode = window.localStorage.getItem(WEB_MODE_KEY) || "auto";
+let activeProjectId = window.localStorage.getItem(PROJECT_KEY) || null;
+let activeProject = null;
 
 function applyTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -339,6 +343,199 @@ function openMemoryDrawer() {
 function closeMemoryDrawer() {
   byId("memory-drawer").hidden = true;
   byId("memory-backdrop").hidden = true;
+}
+
+function updateActiveProjectChip() {
+  const chip = byId("active-project-chip");
+  if (!chip) return;
+
+  if (!activeProject) {
+    chip.hidden = true;
+    chip.textContent = "";
+    return;
+  }
+
+  chip.hidden = false;
+  chip.textContent = "⌘ " + activeProject.name + " · " + activeProject.file_count + " files";
+}
+
+function renderProjectFiles(files) {
+  const list = byId("project-file-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!files.length) {
+    const empty = document.createElement("div");
+    empty.className = "project-empty";
+    empty.textContent = "No project files imported yet.";
+    list.append(empty);
+    return;
+  }
+
+  for (const file of files.slice(0, 250)) {
+    const row = document.createElement("div");
+    row.className = "project-file-row";
+
+    const path = document.createElement("span");
+    path.textContent = file.path;
+    path.title = file.path;
+
+    const lang = document.createElement("small");
+    lang.textContent = file.language;
+
+    row.append(path, lang);
+    list.append(row);
+  }
+}
+
+function renderProjects(projects) {
+  const list = byId("project-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!projects.length) {
+    const empty = document.createElement("div");
+    empty.className = "project-empty";
+    empty.textContent = "No projects yet. Create one, then import a folder.";
+    list.append(empty);
+    return;
+  }
+
+  for (const project of projects) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "project-row";
+    button.dataset.projectId = project.id;
+    button.classList.toggle("active", project.id === activeProjectId);
+
+    const copy = document.createElement("span");
+    copy.innerHTML = "<strong></strong><small></small>";
+    copy.querySelector("strong").textContent = project.name;
+    copy.querySelector("small").textContent = project.file_count + " files";
+
+    const arrow = document.createElement("b");
+    arrow.textContent = "→";
+
+    button.append(copy, arrow);
+    list.append(button);
+  }
+}
+
+async function refreshProjects() {
+  if (!runtimeFeatures.projects) return;
+
+  try {
+    const data = await api("/api/projects?limit=50");
+    renderProjects(data.projects || []);
+
+    if (activeProjectId) {
+      const found = (data.projects || []).find(item => item.id === activeProjectId);
+      if (!found) {
+        activeProjectId = null;
+        activeProject = null;
+        window.localStorage.removeItem(PROJECT_KEY);
+        updateActiveProjectChip();
+        byId("project-detail").hidden = true;
+      }
+    }
+  } catch (error) {
+    toast("Projects: " + error.message);
+  }
+}
+
+async function loadProject(id, announce = true) {
+  if (!runtimeFeatures.projects) {
+    warnStaleBackend();
+    return;
+  }
+
+  const data = await api("/api/projects/" + encodeURIComponent(id));
+  activeProjectId = data.project.id;
+  activeProject = data.project;
+  window.localStorage.setItem(PROJECT_KEY, activeProjectId);
+
+  byId("project-detail").hidden = false;
+  byId("project-detail-name").textContent = activeProject.name;
+  byId("project-file-count").textContent = activeProject.file_count + " files";
+  renderProjectFiles(data.files || []);
+  updateActiveProjectChip();
+  renderProjects((await api("/api/projects?limit=50")).projects || []);
+
+  if (announce) {
+    toast("Project context active: " + activeProject.name);
+  }
+}
+
+function openProjectsDrawer() {
+  if (!runtimeFeatures.projects) {
+    warnStaleBackend();
+    return;
+  }
+
+  byId("projects-drawer").hidden = false;
+  byId("projects-backdrop").hidden = false;
+  refreshProjects();
+
+  if (activeProjectId) {
+    loadProject(activeProjectId, false).catch(() => {});
+  }
+}
+
+function closeProjectsDrawer() {
+  byId("projects-drawer").hidden = true;
+  byId("projects-backdrop").hidden = true;
+}
+
+async function importProjectFolder(fileList) {
+  if (!runtimeFeatures.projects || !activeProjectId) {
+    throw new Error("Select a project before importing files.");
+  }
+
+  const files = Array.from(fileList || []).slice(0, 400);
+  if (!files.length) return;
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const file of files) {
+    if (file.size > 550000) {
+      skipped += 1;
+      continue;
+    }
+
+    let content;
+    try {
+      content = await file.text();
+    } catch (_) {
+      skipped += 1;
+      continue;
+    }
+
+    if (!content.trim() || content.includes("\u0000")) {
+      skipped += 1;
+      continue;
+    }
+
+    const path = file.webkitRelativePath || file.name;
+
+    try {
+      await api(
+        "/api/projects/" + encodeURIComponent(activeProjectId) + "/files",
+        "POST",
+        { path, content }
+      );
+      imported += 1;
+    } catch (error) {
+      skipped += 1;
+    }
+  }
+
+  await loadProject(activeProjectId, false);
+  await refreshProjects();
+  toast(
+    "Imported " + imported + " project file(s)" +
+    (skipped ? " · skipped " + skipped : "") + "."
+  );
 }
 
 function renderFileChips(files) {
@@ -982,7 +1179,8 @@ async function refreshStatus() {
       adaptive_reasoning: Boolean(advertised.adaptive_reasoning),
       streaming: Boolean(advertised.streaming),
       web: Boolean(advertised.web),
-      files: Boolean(advertised.files)
+      files: Boolean(advertised.files),
+      projects: Boolean(advertised.projects)
     };
 
     setWebMode(webMode, false);
@@ -998,6 +1196,13 @@ async function refreshStatus() {
     const fileLabel = byId("file-cap-label");
     if (fileState) fileState.classList.toggle("live", runtimeFeatures.files);
     if (fileLabel) fileLabel.textContent = runtimeFeatures.files ? "Ready" : "Restart";
+
+    const projectState = byId("project-cap-state");
+    const projectLabel = byId("project-cap-label");
+    const projectBadge = byId("projects-nav")?.querySelector("em");
+    if (projectState) projectState.classList.toggle("live", runtimeFeatures.projects);
+    if (projectLabel) projectLabel.textContent = runtimeFeatures.projects ? "Ready" : "Restart";
+    if (projectBadge) projectBadge.textContent = runtimeFeatures.projects ? "Ready" : "Restart";
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -1090,6 +1295,9 @@ byId("conversation-list").addEventListener("click", async event => {
   }
 });
 byId("theme-toggle").addEventListener("click", toggleTheme);
+byId("projects-nav").addEventListener("click", openProjectsDrawer);
+byId("projects-close").addEventListener("click", closeProjectsDrawer);
+byId("projects-backdrop").addEventListener("click", closeProjectsDrawer);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
@@ -1127,6 +1335,84 @@ byId("file-chips").addEventListener("click", async event => {
     await refreshAttachments();
   } catch (error) {
     toast("Files: " + error.message);
+  }
+});
+
+byId("project-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!runtimeFeatures.projects) {
+    warnStaleBackend();
+    return;
+  }
+
+  const name = byId("project-name").value.trim();
+  if (!name) return;
+
+  try {
+    const data = await api("/api/projects", "POST", { name });
+    byId("project-name").value = "";
+    await loadProject(data.project.id);
+    await refreshProjects();
+  } catch (error) {
+    toast("Projects: " + error.message);
+  }
+});
+
+byId("project-list").addEventListener("click", async event => {
+  const button = event.target.closest("[data-project-id]");
+  if (!button) return;
+
+  try {
+    await loadProject(button.dataset.projectId);
+  } catch (error) {
+    toast("Projects: " + error.message);
+  }
+});
+
+byId("project-import").addEventListener("click", () => {
+  if (!activeProjectId) {
+    toast("Create or select a project first.");
+    return;
+  }
+  byId("project-folder-input").click();
+});
+
+byId("project-folder-input").addEventListener("change", async event => {
+  byId("project-import").disabled = true;
+  try {
+    await importProjectFolder(event.target.files);
+  } catch (error) {
+    toast("Projects: " + error.message);
+  } finally {
+    event.target.value = "";
+    byId("project-import").disabled = false;
+  }
+});
+
+byId("project-refresh").addEventListener("click", async () => {
+  if (!activeProjectId) return;
+  try {
+    await loadProject(activeProjectId, false);
+  } catch (error) {
+    toast("Projects: " + error.message);
+  }
+});
+
+byId("project-delete").addEventListener("click", async () => {
+  if (!activeProjectId || !activeProject) return;
+  if (!confirm("Delete the local project snapshot “" + activeProject.name + "”?")) return;
+
+  try {
+    await api("/api/projects/" + encodeURIComponent(activeProjectId), "DELETE");
+    activeProjectId = null;
+    activeProject = null;
+    window.localStorage.removeItem(PROJECT_KEY);
+    updateActiveProjectChip();
+    byId("project-detail").hidden = true;
+    toast("Project snapshot deleted.");
+    await refreshProjects();
+  } catch (error) {
+    toast("Projects: " + error.message);
   }
 });
 
@@ -1275,6 +1561,10 @@ byId("chat-form").addEventListener("submit", async event => {
     payload.memory_enabled = true;
   }
 
+  if (runtimeFeatures.projects && activeProjectId) {
+    payload.project_id = activeProjectId;
+  }
+
   const autoWeb = runtimeFeatures.web && shouldAutoUseWeb(text);
   if (runtimeFeatures.web) {
     payload.web_enabled =
@@ -1404,6 +1694,15 @@ byId("chat-form").addEventListener("submit", async event => {
         await refreshMemories();
         await refreshAttachments();
         await refreshConversationList();
+        await refreshProjects();
+        if (activeProjectId && runtimeFeatures.projects) {
+          await loadProject(activeProjectId, false).catch(() => {
+            activeProjectId = null;
+            activeProject = null;
+            window.localStorage.removeItem(PROJECT_KEY);
+            updateActiveProjectChip();
+          });
+        }
       } catch (error) {
         byId("error").textContent = error.message;
       }
