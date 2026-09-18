@@ -1,9 +1,10 @@
-"""Three-role routing, validated configuration, and conservative cost estimates."""
+"""Three-role routing, capability-aware prompting, and conservative cost estimates."""
 from __future__ import annotations
 
 import ipaddress
 import json
 import re
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, ROUND_CEILING
 from enum import StrEnum
@@ -116,49 +117,172 @@ class Settings(StrictModel):
         return next(p for p in self.profiles if p.role == role)
 
 
+HELIX_CAPABILITY_CONTEXT = (
+    "Current Helix runtime facts: local text inference is connected when the provider mode is local; "
+    "persistent local user memory and conversation history are available. Internet/web browsing, live news, "
+    "email, calendar, voice, file ingestion, terminal access, repository mutation, deployment, purchases, "
+    "and other external actions are NOT connected in this build. Never claim those capabilities are available. "
+    "Never invent a training-data cutoff or say your knowledge is current to a specific date unless Helix "
+    "explicitly supplies that fact. If the user asks what Helix can do, what it cannot do, or how to improve it, "
+    "answer about these actual Helix capabilities and the concrete engineering path forward instead of giving "
+    "generic chatbot boilerplate."
+)
+
 PROMPTS = {
     Role.COMPANION: (
-        "You are Helix Companion, a conversational personal assistant. Understand the user's "
-        "intent, communicate clearly, and distinguish evidence from guesses. You may receive "
-        "explicitly stored private user memories supplied by Helix; use them only when relevant "
-        "and never invent additional memories. This prototype has no calendar, email, reminder, "
-        "browser, or other action tools. Never claim to have performed an action or accessed "
-        "private data that Helix did not provide."
+        "You are Helix Companion, the personal-assistance brain inside Helix. Be natural, useful, direct, and "
+        "context-aware. Prefer accomplishing the user's conversational goal over reciting generic AI caveats. "
+        "You may receive explicitly stored private user memories supplied by Helix; use them only when relevant "
+        "and never invent additional memories. When the user asks a personal question and relevant memory exists, "
+        "use it. Distinguish remembered user context from verified external facts. "
+        + HELIX_CAPABILITY_CONTEXT
     ),
     Role.ENGINEER: (
-        "You are Helix Engineer, focused on programming, debugging and software operations. "
-        "Provide implementable code and explicit validation steps. You may receive relevant "
-        "project or preference memories supplied by Helix; treat them as user-provided context "
-        "that may become stale. This prototype has no terminal, repository or deployment tools. "
-        "Never claim tests passed or code was changed without actual tool evidence."
+        "You are Helix Engineer, the software-engineering brain inside Helix. Think like a senior engineer: "
+        "identify the goal, inspect the available context, propose the smallest sound change, call out risks, "
+        "and give implementable code or validation steps. Prefer patch-oriented, concrete answers over tutorials. "
+        "You may receive relevant project or preference memories supplied by Helix; treat them as user-provided "
+        "context that can become stale. Never claim tests passed, code changed, repositories were inspected, or "
+        "deployments happened without actual tool evidence. "
+        + HELIX_CAPABILITY_CONTEXT
     ),
     Role.SAGE: (
-        "You are Helix Sage, focused on research, mathematics and careful reasoning. Separate "
-        "facts, assumptions and conclusions. You may receive relevant user memories supplied by "
-        "Helix; distinguish those private user facts from externally verified evidence. This "
-        "prototype has no browsing or calculation tools. Do not invent citations or claim "
-        "external verification. State uncertainty where evidence is missing."
+        "You are Helix Sage, the deep-reasoning and research brain inside Helix. Decompose difficult questions, "
+        "test assumptions, compare alternatives, and make uncertainty visible. Separate user-provided memory, "
+        "model knowledge, inference, and externally verified evidence. Do not invent citations or claim external "
+        "verification. Give conclusions only as strongly as the evidence supports them. "
+        + HELIX_CAPABILITY_CONTEXT
     ),
 }
 
 
-def select_role(req: ChatRequest) -> tuple[Role, str]:
-    """Cheap starter rules, NOT a learned or quality-validated routing policy."""
+@dataclass(frozen=True)
+class RouteDecision:
+    role: Role
+    reason: str
+    confidence: float
+    scores: dict[str, int]
+
+
+ENGINEER_PATTERNS: tuple[tuple[str, int], ...] = (
+    (r"\b(code|coding|programming|typescript|javascript|python|rust|go|java|sql)\b", 4),
+    (r"\b(debug|bug|exception|traceback|stack trace|failing test|fix ci|ci/cd)\b", 5),
+    (r"\b(repo|repository|git|github|pull request|pr\b|commit|branch)\b", 4),
+    (r"\b(api|endpoint|database|schema|migration|backend|frontend|server|docker|kubernetes)\b", 3),
+    (r"\b(deploy|build|compile|refactor|implement|function|class|module|package)\b", 3),
+    (r"\b(performance|latency|memory leak|race condition|deadlock|concurrency|distributed)\b", 4),
+)
+
+SAGE_PATTERNS: tuple[tuple[str, int], ...] = (
+    (r"\b(prove|proof|theorem|lemma|mathematics|equation|derive)\b", 5),
+    (r"\b(research|hypothesis|evidence|scientific|science|study|paper)\b", 4),
+    (r"\b(analy[sz]e|reasoning|reason through|compare|trade[- ]?offs?|evaluate)\b", 2),
+    (r"\b(philosophy|logic|probability|statistics|causal|causality)\b", 3),
+    (r"\b(deep dive|think deeply|careful reasoning|step by step)\b", 3),
+)
+
+COMPANION_PATTERNS: tuple[tuple[str, int], ...] = (
+    (r"\b(remember|memory|my preference|i prefer|i like|i dislike|about me)\b", 4),
+    (r"\b(plan my day|my schedule|organize my day|personal assistant|remind me)\b", 4),
+    (r"\b(write a message|draft a message|help me reply|conversation|talk to me)\b", 2),
+    (r"\b(how old am i|what do you remember|who am i|my birthday|my name)\b", 4),
+)
+
+
+def _score_patterns(text: str, patterns: tuple[tuple[str, int], ...]) -> int:
+    return sum(weight for pattern, weight in patterns if re.search(pattern, text, flags=re.IGNORECASE))
+
+
+def route_decision(req: ChatRequest) -> RouteDecision:
+    """Deterministic local router with scored intent signals and role continuity."""
     if req.role is not None:
-        return req.role, "explicit role selected"
+        return RouteDecision(
+            req.role,
+            "explicit role selected",
+            1.0,
+            {role.value: int(role == req.role) * 10 for role in Role},
+        )
 
-    text = req.messages[-1].content.lower()
+    text = req.messages[-1].content.strip().lower()
 
-    if re.search(r"\b(code|coding|debug|repo|repository|typescript|python|sql|deploy|ci|api|bug|function|git)\b", text):
-        return Role.ENGINEER, "technical task keyword"
+    followup = bool(
+        req.previous_role
+        and len(text.split()) <= 18
+        and re.match(
+            r"^(and\b|why\b|continue\b|what about\b|fix it\b|explain that\b|then\b|also\b|same thing\b)",
+            text,
+        )
+    )
+    if followup:
+        return RouteDecision(
+            req.previous_role,
+            "short follow-up kept role continuity",
+            0.91,
+            {role.value: int(role == req.previous_role) * 8 for role in Role},
+        )
 
-    if re.search(r"\b(prove|theorem|research|hypothesis|mathematics|reasoning|analy[sz]e|science)\b", text):
-        return Role.SAGE, "reasoning or research keyword"
+    scores = {
+        Role.COMPANION.value: _score_patterns(text, COMPANION_PATTERNS),
+        Role.ENGINEER.value: _score_patterns(text, ENGINEER_PATTERNS),
+        Role.SAGE.value: _score_patterns(text, SAGE_PATTERNS),
+    }
 
-    if req.previous_role and re.match(r"^(and\b|why\b|continue\b|what about\b|fix it\b|explain that\b)", text):
-        return req.previous_role, "follow-up role continuity"
+    ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    top_name, top_score = ordered[0]
+    second_score = ordered[1][1]
 
-    return Role.COMPANION, "conversational default"
+    if top_score == 0:
+        return RouteDecision(Role.COMPANION, "conversational default", 0.62, scores)
+
+    if top_score == second_score:
+        if req.previous_role is not None and scores[req.previous_role.value] == top_score:
+            return RouteDecision(req.previous_role, "ambiguous intent kept previous role", 0.68, scores)
+        if scores[Role.ENGINEER.value] == top_score and re.search(
+            r"\b(code|debug|bug|api|repo|git|python|typescript|database)\b",
+            text,
+        ):
+            return RouteDecision(Role.ENGINEER, "technical intent won an ambiguous route", 0.72, scores)
+        if scores[Role.SAGE.value] == top_score and re.search(
+            r"\b(research|proof|theorem|evidence|scientific)\b",
+            text,
+        ):
+            return RouteDecision(Role.SAGE, "research intent won an ambiguous route", 0.72, scores)
+        return RouteDecision(Role.COMPANION, "ambiguous intent defaulted to Companion", 0.58, scores)
+
+    role = Role(top_name)
+    margin = top_score - second_score
+    confidence = min(0.96, 0.68 + 0.06 * margin + 0.02 * min(top_score, 5))
+
+    reason_map = {
+        Role.COMPANION: "personal or conversational intent",
+        Role.ENGINEER: "software-engineering intent",
+        Role.SAGE: "research or deep-reasoning intent",
+    }
+    return RouteDecision(role, reason_map[role], confidence, scores)
+
+
+def select_role(req: ChatRequest) -> tuple[Role, str]:
+    decision = route_decision(req)
+    return decision.role, decision.reason
+
+
+DEEP_ENGINEER_PATTERN = re.compile(
+    r"\b(architecture|distributed|race condition|deadlock|concurrency|security|threat model|"
+    r"performance|latency|memory leak|root cause|algorithm|database design|migration plan|"
+    r"system design|complex refactor|incident|production failure)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def reasoning_mode(role: Role, req: ChatRequest) -> str:
+    """Choose fast/deep inference without exposing hidden reasoning."""
+    if role == Role.SAGE:
+        return "deep"
+
+    if role == Role.ENGINEER and DEEP_ENGINEER_PATTERN.search(req.messages[-1].content):
+        return "deep"
+
+    return "fast"
 
 
 def make_messages(role: Role, req: ChatRequest) -> list[dict]:
@@ -166,7 +290,7 @@ def make_messages(role: Role, req: ChatRequest) -> list[dict]:
         m.model_dump() for m in req.messages
     ]
 
-    directive = "/think" if role == Role.SAGE else "/no_think"
+    directive = "/think" if reasoning_mode(role, req) == "deep" else "/no_think"
 
     for message in reversed(messages):
         if message["role"] == "user":
