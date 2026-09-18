@@ -494,11 +494,30 @@ async function importProjectFolder(fileList) {
   const files = Array.from(fileList || []).slice(0, 400);
   if (!files.length) return;
 
-  let imported = 0;
+  const allowed = new Set([
+    "txt","md","markdown","json","yaml","yml","toml","ini","cfg","csv","tsv",
+    "py","js","mjs","cjs","ts","tsx","jsx","java","c","h","cpp","hpp","cs",
+    "go","rs","rb","php","swift","kt","kts","sql","sh","ps1","bat","cmd",
+    "html","css","scss","xml","vue","svelte","graphql","gql","properties","gradle"
+  ]);
+  const allowedNames = new Set([
+    "dockerfile","makefile","procfile","gemfile","rakefile","license","readme",
+    "agents.md","claude.md",".gitignore",".dockerignore",".editorconfig"
+  ]);
+
+  const prepared = [];
   let skipped = 0;
 
   for (const file of files) {
-    if (file.size > 550000) {
+    const relative = file.webkitRelativePath || file.name;
+    const leaf = file.name.toLowerCase();
+    const extension = leaf.includes(".") ? leaf.split(".").pop() : "";
+    const allowedPath =
+      allowed.has(extension) ||
+      allowedNames.has(leaf) ||
+      leaf.endsWith(".env.example");
+
+    if (!allowedPath || file.size > 500000) {
       skipped += 1;
       continue;
     }
@@ -516,19 +535,40 @@ async function importProjectFolder(fileList) {
       continue;
     }
 
-    const path = file.webkitRelativePath || file.name;
-
-    try {
-      await api(
-        "/api/projects/" + encodeURIComponent(activeProjectId) + "/files",
-        "POST",
-        { path, content }
-      );
-      imported += 1;
-    } catch (error) {
-      skipped += 1;
-    }
+    prepared.push({ path: relative, content });
   }
+
+  let imported = 0;
+  let batch = [];
+  let batchChars = 0;
+
+  async function flushBatch() {
+    if (!batch.length) return;
+
+    const data = await api(
+      "/api/projects/" + encodeURIComponent(activeProjectId) + "/files/batch",
+      "POST",
+      { files: batch }
+    );
+
+    imported += (data.added || []).length;
+    skipped += (data.skipped || []).length;
+    batch = [];
+    batchChars = 0;
+  }
+
+  for (const item of prepared) {
+    const size = item.path.length + item.content.length;
+
+    if (batch.length >= 20 || (batch.length && batchChars + size > 450000)) {
+      await flushBatch();
+    }
+
+    batch.push(item);
+    batchChars += size;
+  }
+
+  await flushBatch();
 
   await loadProject(activeProjectId, false);
   await refreshProjects();
