@@ -327,6 +327,68 @@ async function refreshMemories() {
     empty.textContent = error.message;
     byId("memory-list").append(empty);
   }
+
+  await refreshKnowledge();
+}
+
+function renderKnowledgeList(entries) {
+  const list = byId("knowledge-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!entries.length) {
+    const empty = document.createElement("div");
+    empty.className = "knowledge-empty";
+    empty.textContent = "No sourced web knowledge saved yet.";
+    list.append(empty);
+    return;
+  }
+
+  for (const entry of entries) {
+    const card = document.createElement("article");
+    card.className = "knowledge-item";
+
+    const link = document.createElement("a");
+    link.href = entry.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = entry.title;
+
+    const query = document.createElement("small");
+    query.textContent = "Learned from: " + entry.query;
+
+    const time = document.createElement("small");
+    time.textContent = "Updated: " + new Date(entry.updated_at).toLocaleString();
+
+    card.append(link, query, time);
+    list.append(card);
+  }
+}
+
+async function refreshKnowledge() {
+  const list = byId("knowledge-list");
+  if (!list) return;
+
+  if (!runtimeFeatures.web) {
+    list.innerHTML = '<div class="knowledge-empty">Restart Helix to enable sourced web knowledge.</div>';
+    return;
+  }
+
+  try {
+    const data = await api("/api/knowledge?limit=50");
+    renderKnowledgeList(data.knowledge || []);
+
+    const label = byId("knowledge-cap-label");
+    if (label) {
+      label.textContent = (data.knowledge || []).length + " sourced";
+    }
+  } catch (error) {
+    list.innerHTML = "";
+    const empty = document.createElement("div");
+    empty.className = "knowledge-empty";
+    empty.textContent = error.message;
+    list.append(empty);
+  }
 }
 
 function appendInline(parent, text) {
@@ -575,6 +637,7 @@ async function streamChat(payload, selectedRole) {
           live.knowledge = event.knowledge_used || [];
           if (event.knowledge_learned) {
             toast("Helix learned " + event.knowledge_learned + " sourced web item(s) locally.");
+            refreshKnowledge();
           }
           if (event.web_error) toast("Web: " + event.web_error);
           if (event.memory_saved) {
@@ -867,6 +930,20 @@ byId("memory-list").addEventListener("click", async event => {
   }
 });
 
+byId("knowledge-clear").addEventListener("click", async () => {
+  if (!confirm("Clear all locally learned web knowledge? User memories and conversations will not be deleted.")) {
+    return;
+  }
+
+  try {
+    const data = await api("/api/knowledge", "DELETE");
+    toast("Cleared " + data.deleted + " sourced knowledge item(s).");
+    await refreshKnowledge();
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
 document.querySelectorAll(".brain-choice").forEach(button => {
   button.addEventListener("click", () => setRole(button.dataset.role));
 });
@@ -1006,6 +1083,7 @@ byId("chat-form").addEventListener("submit", async event => {
 
     if (data.knowledge_learned) {
       toast("Helix learned " + data.knowledge_learned + " sourced web item(s) locally.");
+      refreshKnowledge();
     }
 
     if (data.web_error) {
