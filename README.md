@@ -1,92 +1,122 @@
 # Helix · local-first AI command center
 
-**Companion · Engineer · Sage** — one Helix identity, at most three primary model roles, explicit privacy boundaries, and measurable cost controls.
+**Companion · Engineer · Sage** — one Helix identity with three specialized roles, local memory, live web grounding, sourced learning, files, streaming, and explicit privacy/cost boundaries.
 
-Helix is currently a **single-owner local prototype**. It can route requests across the three Helix roles and connect to an operator-supplied OpenAI-compatible local model server such as llama.cpp. Cloud fallback remains disabled by default.
+Helix is currently a **single-owner local prototype**. The founder build runs an OpenAI-compatible local model through llama.cpp and does not require a paid model API. Cloud fallback remains disabled by default.
 
-## Current local stack
+## Current feature branch
 
-- Helix UI + FastAPI gateway on loopback only.
-- Companion, Engineer, and Sage routing.
-- Local model adapter with no automatic paid fallback.
-- SQLite cost ledger.
-- **Private local user memory** in SQLite.
-- **Persistent local conversations** across browser reloads/restarts.
-- Explicit memory capture with phrases such as `Remember that …`.
-- Memory management UI: add, pin/unpin, and delete.
-- Relevant memories are selectively injected into model context.
-- Command-center UI showing runtime, route, model, cost, and capability state.
+The active branch is `feat/codex-inspired-ui-v02` and is still awaiting founder-machine validation before merge.
 
-Memory is private application state. It is **not training data**.
+Implemented on that branch:
 
-## Windows local model setup
+- real local Qwen/llama.cpp inference;
+- scored Auto routing across Companion / Engineer / Sage;
+- adaptive fast/deep reasoning policy;
+- token-by-token streamed responses plus **Stop**;
+- reused HTTP connections to reduce local inference overhead;
+- private local user memory and persistent conversation history;
+- recent-conversation sidebar with restore/delete;
+- live web research with **Web Auto / On / Off** controls;
+- source links under grounded answers;
+- local sourced-knowledge cache learned from explicit web research;
+- inspect + clear controls for learned web knowledge;
+- local text/code attachments selected by the user in the browser;
+- relevant file snippets injected as untrusted context;
+- dark Codex-like default UI plus optional Helix-branded light mode;
+- local cost ledger and no automatic paid-provider fallback.
 
-This repository does not ship model weights.
+## What “learn” means in this build
 
-The current founder machine uses a local llama.cpp-compatible endpoint. A typical setup is:
+Helix does **not** silently retrain Qwen on arbitrary internet content.
+
+When web research is used:
+
+1. Helix searches the public web.
+2. It fetches a small number of text pages.
+3. The current answer receives numbered source context.
+4. Useful retrieved text is stored locally with its source URL.
+5. Later related questions can retrieve that sourced knowledge even with live web turned off.
+
+That local knowledge can be inspected and cleared. It is retrieval memory, **not model-weight training**, and private user memory is not training data.
+
+## Internet modes
+
+The UI exposes three modes:
+
+- **Auto** — use live research for clearly fresh/current questions such as “latest”, “today”, “news”, or explicit web lookup requests.
+- **On** — use web research for every request.
+- **Off** — never use live web research.
+
+The starter zero-key search adapter uses DuckDuckGo HTML and direct text-page retrieval. It blocks private/loopback/link-local targets, credentials, nonstandard ports, redirects, JavaScript execution, and oversized responses. This is suitable for local prototyping, not a production search SLA.
+
+## Local files
+
+Helix can attach browser-selected **text/code files** to a conversation. It does not get arbitrary filesystem access.
+
+Supported in this build:
+
+- common source-code and text formats;
+- local SQLite storage under the ignored `.helix` runtime area;
+- per-conversation listing/removal;
+- relevance-based file context for later questions;
+- prompt-injection boundary: attached content is treated as untrusted user data.
+
+Binary files, PDFs, images, repository mutation, and terminal execution are still separate roadmap work.
+
+## Windows quick run
+
+Keep llama.cpp running separately, for example:
 
 ```powershell
 llama-server -hf ggml-org/Qwen3-4B-GGUF:Q4_K_M
 ```
 
-Then configure the uncommitted `config/local.json` to point all three starter roles at the loopback endpoint and start Helix:
+Then from the Helix directory:
 
 ```powershell
-& ".\.venv\Scripts\python.exe" -m helix --config ".\config\local.json"
+git fetch origin
+git switch feat/codex-inspired-ui-v02
+git pull --ff-only
+.\DEV_LOOP_WINDOWS.cmd
 ```
 
-The application binds to:
+The engineering loop runs tests, compile checks, the local routing/intelligence evaluation, private-file checks, verifies the llama.cpp endpoint, and then launches Helix.
 
-```text
-http://127.0.0.1:8765
-```
+Helix app: `http://127.0.0.1:8765`
 
-The local model server remains separate, typically on port `8080`.
+Local model endpoint used by the founder build: `http://127.0.0.1:8080/v1`
 
-## Memory behavior
+## Tests
 
-Helix currently stores local memory under `.helix/`, which is excluded from Git.
-
-Memory v0.2 intentionally uses conservative behavior:
-
-- users can add memories manually;
-- users can pin/unpin or delete them;
-- saying `Remember that …` explicitly stores a memory;
-- Helix retrieves only a small relevant set for each request;
-- pinned memories may be included broadly;
-- memory rows include a future-facing `user_id` boundary, while this build still supports only one local owner.
-
-Broader silent memory inference is intentionally deferred until review, undo, expiry, and account-isolation controls are stronger.
-
-## Conversations
-
-The browser keeps the current conversation identifier locally. Messages for that conversation are stored in the local Helix SQLite memory database and can be restored after reload/restart.
-
-This is **not** yet a multi-user SaaS conversation system.
-
-## Run tests
+Run directly with:
 
 ```powershell
 & ".\.venv\Scripts\python.exe" -m pytest -q
+& ".\.venv\Scripts\python.exe" -m compileall -q helix tests tools
+& ".\.venv\Scripts\python.exe" tools\intelligence_eval.py
 ```
 
-New memory tests cover:
+The branch contains tests for routing, adaptive reasoning, provider transport, visible-only streaming, memory, conversations, guarded web primitives, sourced knowledge, file storage/retrieval, and server APIs.
 
-- add/list/retrieve/delete;
-- explicit memory capture and de-duplication;
-- persistent conversation messages;
-- memory API behavior;
-- injection of relevant private memory into model context.
+**Do not treat those tests as passed on the founder PC until the local run completes.**
 
-Run the suite on the Windows founder machine before merging the current feature branch.
+## Current boundaries
 
-## Important boundaries
+Still not connected:
 
-Helix still has **no connected web browser, email, calendar, terminal, deployment executor, voice runtime, payment system, or multi-tenant authentication**.
+- voice / wake word;
+- email and calendar;
+- binary/PDF/image ingestion;
+- arbitrary local filesystem access;
+- terminal / shell execution;
+- repository mutation or deployment;
+- autonomous purchases/actions;
+- multi-user authentication and tenant isolation;
+- training/fine-tuning/distillation;
+- production cloud autoscaling/subscriptions.
 
-The command center surfaces those modules as roadmap capabilities but does not pretend they are active.
-
-The local model can still be wrong. A remembered user fact is user-provided context, not independently verified evidence.
+The local model can be wrong. Web citations show retrieved sources, not a guarantee that every source is correct.
 
 ## Project docs
 
