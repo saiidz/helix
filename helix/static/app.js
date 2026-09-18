@@ -10,10 +10,12 @@ let runtimeFeatures = {
   persistent_conversations: false,
   routing_scores: false,
   adaptive_reasoning: false,
+  streaming: false,
   web: false
 };
 let staleBackendWarningShown = false;
 let webEnabled = false;
+let currentAbortController = null;
 
 const THEME_KEY = "helixTheme";
 
@@ -414,6 +416,158 @@ function pendingMessage(role) {
   return box;
 }
 
+function streamingMessage(role) {
+  removeWelcome();
+
+  const box = document.createElement("div");
+  box.className = "message assistant streaming";
+
+  const title = document.createElement("b");
+  title.textContent = role ? "Helix " + roleName(role) : "Helix";
+
+  const body = document.createElement("div");
+  body.className = "message-body live-output";
+  body.textContent = "";
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = "streaming…";
+
+  box.append(title, body, meta);
+  byId("messages").append(box);
+  box.scrollIntoView({ block: "end", behavior: "smooth" });
+
+  return { box, title, body, meta, text: "", sources: [] };
+}
+
+function setGenerationState(active) {
+  const send = byId("send");
+  if (active) {
+    send.disabled = false;
+    send.textContent = "Stop";
+    send.classList.add("stop");
+  } else {
+    send.disabled = false;
+    send.textContent = "Send";
+    send.classList.remove("stop");
+  }
+}
+
+async function streamChat(payload, selectedRole) {
+  const key = byId("key").value.trim();
+  if (!key) throw new Error("Local access key missing.");
+
+  currentAbortController = new AbortController();
+  setGenerationState(true);
+
+  const requestId = crypto.randomUUID();
+  const response = await fetch("/api/chat/stream", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + key,
+      "Content-Type": "application/json",
+      "Idempotency-Key": requestId
+    },
+    body: JSON.stringify(payload),
+    signal: currentAbortController.signal
+  });
+
+  if (!response.ok) {
+    let detail = "Streaming request rejected (" + response.status + ").";
+    try {
+      const data = await response.json();
+      if (typeof data.detail === "string") detail = data.detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+
+  const live = streamingMessage(selectedRole);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let metaEvent = null;
+  let doneEvent = null;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const raw of lines) {
+        if (!raw.trim()) continue;
+        const event = JSON.parse(raw);
+
+        if (event.type === "meta") {
+          metaEvent = event;
+          live.title.textContent = "Helix " + roleName(event.role);
+          updateRoute(
+            event.role,
+            event.reason || "Routed by Helix",
+            event.routing_confidence,
+            event.reasoning_mode
+          );
+          live.sources = event.web_sources || [];
+          if (event.web_error) toast("Web: " + event.web_error);
+          if (event.memory_saved) {
+            toast("Helix saved that to your private local memory.");
+            refreshMemories();
+          }
+        } else if (event.type === "delta") {
+          live.text += event.text || "";
+          live.body.textContent = live.text;
+          live.box.scrollIntoView({ block: "end" });
+        } else if (event.type === "done") {
+          doneEvent = event;
+        } else if (event.type === "error") {
+          throw new Error(event.detail || "Streaming request failed.");
+        }
+      }
+    }
+
+    live.box.classList.remove("streaming");
+    live.body.innerHTML = "";
+    renderRichText(live.body, live.text || "No visible response was returned.");
+
+    const providerMode = metaEvent?.provider_mode || "local";
+    const modelId = metaEvent?.model_id || "model";
+    const cost = typeof doneEvent?.model_cost_usd === "number"
+      ? doneEvent.model_cost_usd.toFixed(6)
+      : "0.000000";
+
+    live.meta.textContent =
+      providerMode + " · " + modelId + " · $" + cost +
+      (metaEvent?.memory_used?.length ? " · " + metaEvent.memory_used.length + " memory" : "") +
+      (live.sources.length ? " · web grounded" : "") +
+      " · unverified";
+
+    appendSources(live.box, live.sources);
+
+    return {
+      text: live.text,
+      role: metaEvent?.role || selectedRole || "companion",
+      meta: metaEvent,
+      done: doneEvent
+    };
+  } catch (error) {
+    if (error.name === "AbortError") {
+      live.box.classList.remove("streaming");
+      live.body.textContent = live.text || "Generation stopped.";
+      live.meta.textContent = "stopped by user · partial response not saved";
+      toast("Generation stopped.");
+      return { aborted: true, text: live.text };
+    }
+    live.box.remove();
+    throw error;
+  } finally {
+    currentAbortController = null;
+    setGenerationState(false);
+  }
+}
+
 function updateRoute(role, reason = "", confidence = null, mode = "") {
   const actualRole = role || "";
   const target = byId("route-target");
@@ -517,6 +671,7 @@ async function refreshStatus() {
       persistent_conversations: Boolean(advertised.persistent_conversations || legacyMemory),
       routing_scores: Boolean(advertised.routing_scores),
       adaptive_reasoning: Boolean(advertised.adaptive_reasoning),
+      streaming: Boolean(advertised.streaming),
       web: Boolean(advertised.web)
     };
 
@@ -658,6 +813,13 @@ document.querySelectorAll("[data-soon]").forEach(button => {
   });
 });
 
+byId("send").addEventListener("click", event => {
+  if (currentAbortController) {
+    event.preventDefault();
+    currentAbortController.abort();
+  }
+});
+
 byId("prompt").addEventListener("input", autoGrow);
 byId("prompt").addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey) {
@@ -719,10 +881,30 @@ byId("chat-form").addEventListener("submit", async event => {
   }
 
   message("You", text, "user");
-  const pending = pendingMessage(selectedRole);
-
   byId("prompt").value = "";
   autoGrow();
+
+  if (runtimeFeatures.streaming) {
+    byId("send").disabled = false;
+    try {
+      const result = await streamChat(payload, selectedRole);
+      if (!result.aborted) {
+        chatHistory = [
+          ...current,
+          { role: "assistant", content: result.text }
+        ];
+        previousRole = result.role;
+      }
+    } catch (error) {
+      byId("error").textContent = error.message;
+      setGenerationState(false);
+    } finally {
+      byId("prompt").focus();
+    }
+    return;
+  }
+
+  const pending = pendingMessage(selectedRole);
 
   try {
     const data = await api(
