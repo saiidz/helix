@@ -375,3 +375,159 @@ html[data-theme="light"] .workspace{
     radial-gradient(circle at 78% 0%,rgba(108,67,255,.06),transparent 28%),
     var(--workspace);
 }
+
+
+/* Final light-mode corrections.
+   Dark mode intentionally stays Codex-like; light mode must be internally consistent. */
+html[data-theme="light"] body,
+html[data-theme="light"] .shell{
+  background:var(--bg);
+  color:var(--text);
+}
+
+html[data-theme="light"] .rail,
+html[data-theme="light"] .intel{
+  background:var(--rail);
+  color:var(--text);
+}
+
+html[data-theme="light"] .rail{
+  border-right-color:var(--border);
+}
+
+html[data-theme="light"] .intel{
+  border-left-color:var(--border);
+}
+
+html[data-theme="light"] .workspace{
+  background:
+    radial-gradient(circle at 26% -10%,rgba(69,199,255,.08),transparent 30%),
+    radial-gradient(circle at 76% -4%,rgba(108,67,255,.06),transparent 28%),
+    var(--workspace);
+}
+
+html[data-theme="light"] .workspace-bar{
+  background:var(--bar-bg);
+  color:var(--text);
+  border-bottom-color:var(--border);
+}
+
+html[data-theme="light"] .new-task,
+html[data-theme="light"] .local-card,
+html[data-theme="light"] .settings[open],
+html[data-theme="light"] .route-target,
+html[data-theme="light"] .route-source,
+html[data-theme="light"] .vision-strip>div,
+html[data-theme="light"] .memory-form,
+html[data-theme="light"] .memory-item,
+html[data-theme="light"] .composer{
+  background:var(--panel);
+  color:var(--text);
+  border-color:var(--border);
+  box-shadow:var(--shadow);
+}
+
+html[data-theme="light"] .intent-card{
+  background:linear-gradient(180deg,#ffffff,#f7f9fd);
+  color:var(--text);
+  border-color:var(--border);
+  box-shadow:0 10px 26px rgba(10,21,72,.05);
+}
+
+html[data-theme="light"] .intent-card:hover{
+  background:#f3f6fd;
+  border-color:var(--border2);
+}
+
+html[data-theme="light"] .message.user{
+  background:#eef3ff;
+  color:var(--text);
+  border-color:#d7e1f7;
+}
+
+html[data-theme="light"] .message.assistant{
+  color:var(--text);
+}
+
+html[data-theme="light"] .composer-zone{
+  background:linear-gradient(to bottom,transparent,var(--workspace) 30%,var(--workspace) 100%);
+}
+
+html[data-theme="light"] .memory-drawer{
+  background:var(--rail);
+  color:var(--text);
+  border-left-color:var(--border2);
+  box-shadow:-20px 0 55px rgba(10,21,72,.14);
+}
+
+html[data-theme="light"] .toast{
+  background:var(--panel);
+  color:var(--text);
+  border-color:var(--border2);
+}
+
+html[data-theme="light"] .nav-item,
+html[data-theme="light"] .brain-choice{
+  color:var(--muted);
+}
+
+html[data-theme="light"] .nav-item:hover:not(.disabled),
+html[data-theme="light"] .brain-choice:hover{
+  background:#eef3ff;
+  color:var(--text);
+}
+
+html[data-theme="light"] .nav-item.active,
+html[data-theme="light"] .brain-choice.active{
+  color:var(--text);
+  background:linear-gradient(90deg,rgba(47,99,246,.12),rgba(108,67,255,.07));
+  box-shadow:inset 2px 0 0 var(--brand-blue);
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] .memory-form textarea{
+  background:#ffffff;
+  color:var(--text);
+  border-color:var(--border2);
+}
+
+html[data-theme="light"] textarea{
+  color:var(--text);
+}
+
+html[data-theme="light"] .tool-button,
+html[data-theme="light"] .capability-button,
+html[data-theme="light"] .drawer-close,
+html[data-theme="light"] .memory-item-actions button,
+html[data-theme="light"] .secure-pill,
+html[data-theme="light"] .ghost-control,
+html[data-theme="light"] .theme-toggle{
+  background:#ffffff;
+  color:var(--muted);
+  border-color:var(--border);
+}
+
+html[data-theme="light"] .route-source{
+  color:var(--muted);
+}
+
+html[data-theme="light"] .facts dd,
+html[data-theme="light"] .capability-list strong,
+html[data-theme="light"] .memory-item p,
+html[data-theme="light"] .welcome h1,
+html[data-theme="light"] .brand,
+html[data-theme="light"] .workspace-title strong,
+html[data-theme="light"] .intel-head h2{
+  color:var(--text);
+}
+
+html[data-theme="light"] .welcome-copy,
+html[data-theme="light"] .safety p,
+html[data-theme="light"] .memory-intro{
+  color:var(--muted);
+}
+
+html[data-theme="light"] .memory-backdrop{
+  background:rgba(10,21,72,.18);
+}
