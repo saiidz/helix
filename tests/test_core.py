@@ -55,6 +55,17 @@ def test_router_exposes_scores_and_reason():
     assert "engineering" in decision.reason
 
 
+def test_active_project_biases_natural_followup_to_engineer():
+    decision = route_decision(
+        request(
+            "Where is this handled?",
+            project_id="project_12345678",
+        )
+    )
+    assert decision.role == Role.ENGINEER
+    assert decision.scores["engineer"] >= 4
+
+
 def test_reasoning_mode_is_adaptive():
     assert reasoning_mode(Role.COMPANION, request("Help me plan my day")) == "fast"
     assert reasoning_mode(Role.ENGINEER, request("Write a Python helper")) == "fast"
