@@ -675,6 +675,14 @@ def create_app(
             headers={"X-Accel-Buffering": "no"},
         )
 
+    @app.get("/api/knowledge/status", dependencies=[Depends(auth)])
+    def knowledge_status():
+        return {
+            "count": knowledge.count(),
+            "mode": "local_sourced_cache",
+            "training": False,
+        }
+
     @app.get("/api/meter", dependencies=[Depends(auth)])
     def meter():
         return ledger.summary()
