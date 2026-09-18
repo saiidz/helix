@@ -6,6 +6,32 @@ let chatHistory = [];
 let previousRole = null;
 let conversationId = window.localStorage.getItem("helixConversationId") || null;
 
+const THEME_KEY = "helixTheme";
+
+function applyTheme(theme) {
+  const nextTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = nextTheme;
+  window.localStorage.setItem(THEME_KEY, nextTheme);
+
+  const icon = byId("theme-icon");
+  const label = byId("theme-label");
+  const button = byId("theme-toggle");
+
+  if (icon) icon.textContent = nextTheme === "dark" ? "☼" : "☾";
+  if (label) label.textContent = nextTheme === "dark" ? "Light" : "Dark";
+  if (button) {
+    button.setAttribute("aria-pressed", nextTheme === "light" ? "true" : "false");
+    button.title = nextTheme === "dark"
+      ? "Switch to light mode"
+      : "Switch to dark mode";
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme || "dark";
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
 const roleName = role => {
   if (!role) return "Auto";
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -425,6 +451,7 @@ function autoGrow() {
 
 byId("status").addEventListener("click", refreshStatus);
 byId("new-chat").addEventListener("click", resetChat);
+byId("theme-toggle").addEventListener("click", toggleTheme);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
@@ -632,6 +659,7 @@ byId("key").addEventListener("input", () => {
   }
 });
 
+applyTheme(window.localStorage.getItem(THEME_KEY) || "dark");
 setRole("");
 wireIntentCards();
 autoGrow();
