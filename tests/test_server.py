@@ -24,6 +24,9 @@ def test_demo_end_to_end(tmp_path):
     assert data["role"] == "engineer"
     assert data["provider_mode"] == "demo"
     assert data["actions_executed"] == []
+    assert data["reasoning_mode"] == "fast"
+    assert data["routing_confidence"] > 0
+    assert data["routing_scores"]["engineer"] > 0
     assert not data["answer_verified"]
     assert "No AI model was called" in data["text"]
     assert c.post("/api/chat",headers=HEADERS,json=PAYLOAD).status_code == 409
@@ -65,7 +68,11 @@ def test_route_preview_never_calls_provider(tmp_path,monkeypatch):
     c=client(tmp_path)
     r=c.post("/api/route",headers=HEADERS,json=PAYLOAD)
     assert r.status_code == 200
-    assert r.json()["provider_called"] is False
+    data = r.json()
+    assert data["provider_called"] is False
+    assert data["routing_confidence"] > 0
+    assert data["routing_scores"]["engineer"] > 0
+    assert data["reasoning_mode"] == "fast"
 
 
 def cloud_settings(expired=False, enabled=False):
