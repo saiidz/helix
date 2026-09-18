@@ -245,6 +245,48 @@ def test_cached_web_knowledge_is_reused_without_new_web_call(tmp_path,monkeypatc
     )
 
 
+def test_knowledge_management_api(tmp_path,monkeypatch):
+    def fake_complete(profile,messages,max_output):
+        return Completion("answer",10,5)
+
+    def fake_research(query,search_limit=5,fetch_limit=2):
+        return (
+            [SearchResult("Managed source","https://example.com/managed","managed source text")],
+            [WebDocument("Managed source","https://example.com/managed","managed source text")],
+        )
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    monkeypatch.setattr("helix.server.research_web",fake_research)
+
+    c=client(tmp_path)
+    response=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"knowledge-manage-0001",
+        },
+        json={
+            "messages":[{"role":"user","content":"Research managed source"}],
+            "web_enabled":True,
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    status=c.get("/api/knowledge/status",headers=HEADERS)
+    assert status.status_code == 200
+    assert status.json()["count"] == 1
+    assert status.json()["training"] is False
+
+    listing=c.get("/api/knowledge?limit=10",headers=HEADERS)
+    assert listing.status_code == 200
+    assert listing.json()["knowledge"][0]["url"] == "https://example.com/managed"
+
+    cleared=c.delete("/api/knowledge",headers=HEADERS)
+    assert cleared.status_code == 200
+    assert cleared.json()["deleted"] == 1
+    assert c.get("/api/knowledge/status",headers=HEADERS).json()["count"] == 0
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
