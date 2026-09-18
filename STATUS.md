@@ -1,68 +1,106 @@
 # Helix implementation status
 
-Checkpoint: **September 18, 2026** · active feature branch **feat/codex-inspired-ui-v02**.
+Checkpoint: **September 18, 2026** · active branch **feat/codex-inspired-ui-v02**.
 
-## Working baseline already proven on the founder Windows PC
+## Founder-machine baseline already demonstrated
 
-- [x] Local llama.cpp server loaded a real Qwen3 4B Q4_K_M checkpoint.
-- [x] Local model API responded through `http://127.0.0.1:8080/v1`.
-- [x] Helix connected to the local model and returned real generated answers.
-- [x] Companion / Engineer / Sage profiles all point to local inference in the founder configuration.
-- [x] Qwen thinking behavior was measured: `/no_think` returns visible fast answers, while thinking can consume the output budget before final content.
-- [x] Local model cost ledger remains $0 provider cost for the founder local configuration.
-- [x] GitHub repository `saiidz/helix` was initialized and pushed.
+- [x] llama.cpp installed and running on Windows.
+- [x] Qwen3 4B Q4_K_M loaded locally.
+- [x] OpenAI-compatible local endpoint responded on `127.0.0.1:8080/v1`.
+- [x] Helix produced real local generated answers.
+- [x] Local model provider cost configured at $0.
+- [x] Repository pushed to `saiidz/helix`.
 
-## In the current PR branch
+## Implemented in the current branch
 
-- [x] Reworked the browser experience into a Helix command center rather than a generic chat landing page.
-- [x] Added visible Auto / Companion / Engineer / Sage routing state.
-- [x] Added runtime/model/cost/capability status.
-- [x] Added richer chat rendering and interaction states.
-- [x] Added SQLite-backed private user memory.
-- [x] Added memory types, pinning, importance, source, timestamps, and soft deletion.
-- [x] Added conservative explicit capture for `Remember that …`.
-- [x] Added relevant-memory retrieval and injection into model context.
-- [x] Added SQLite conversation persistence.
-- [x] Added conversation APIs and memory APIs.
-- [x] Added a Memory management drawer in the UI.
-- [x] Added new unit/integration tests for memory and conversation persistence.
-- [x] Replaced one-keyword routing with scored Companion / Engineer / Sage intent routing.
-- [x] Added routing confidence and per-role intent scores to route/chat responses.
-- [x] Added adaptive inference effort: Sage is deep by default; Engineer escalates to deep for complex architecture/concurrency/security/performance work; routine Companion/Engineer requests stay fast.
-- [x] Added capability-aware system prompts so Helix describes its real memory/local capabilities instead of generic chatbot boilerplate or invented knowledge cutoffs.
-- [x] Added a zero-credit local intelligence evaluation script and wired it into DEV_LOOP_WINDOWS.cmd.
-- [x] Added route confidence + fast/deep mode visibility to the command-center UI.
+### Intelligence
+- [x] Companion / Engineer / Sage with Auto routing.
+- [x] Scored multi-signal router with confidence and visible routing reason.
+- [x] Fast/deep inference policy: routine Companion/Engineer requests stay fast; Sage and complex engineering can escalate.
+- [x] Capability-aware prompts that avoid invented knowledge cutoffs and generic chatbot boilerplate.
+- [x] Zero-credit deterministic intelligence evaluation script.
 
-## Validation still required before merge
+### Memory and history
+- [x] SQLite private user memory.
+- [x] Explicit `Remember that …` capture.
+- [x] Relevant-memory retrieval.
+- [x] Memory add/pin/unpin/delete UI.
+- [x] Persistent conversations.
+- [x] Recent-conversation sidebar with restore/delete.
+- [x] Conversation deletion also cleans conversation-scoped attachments.
 
-- [ ] Pull the active branch onto the founder Windows PC.
-- [ ] Run the complete Python test suite.
-- [ ] Run compileall.
-- [ ] Run the new zero-credit intelligence eval and confirm all routing/mode cases pass.
-- [ ] Start the real local Qwen/llama.cpp server.
-- [ ] Smoke-test memory add / pin / delete.
-- [ ] Smoke-test `Remember that my birthday is …` then ask about that fact in a later turn.
-- [ ] Reload the browser and confirm the conversation restores.
-- [ ] Verify no secret, `config/local.json`, model weight, or `.helix` database is staged.
-- [ ] Visually inspect desktop command-center layout before merging PR #1.
+### Speed / response UX
+- [x] Reused HTTP connection pool for local provider calls.
+- [x] Token-by-token streamed visible output.
+- [x] Hidden `reasoning_content` is not forwarded.
+- [x] Stop/cancel generation in the UI.
+- [x] Ledger keeps conservative accounting for uncertain interrupted/failed requests.
 
-## Not yet implemented
+### Internet and sourced learning
+- [x] Web Auto / On / Off modes.
+- [x] Auto research for clearly fresh/current prompts.
+- [x] Zero-key DuckDuckGo HTML starter search adapter.
+- [x] Direct text-page retrieval with SSRF-oriented public-network checks.
+- [x] Concurrent page fetches and short-lived search/fetch cache.
+- [x] Numbered web sources returned to the model and surfaced in the UI.
+- [x] Local sourced-knowledge cache with provenance URLs.
+- [x] Cached knowledge can be reused on later questions.
+- [x] Users can inspect and clear learned web knowledge.
+- [x] Knowledge cache is retrieval memory, not automatic weight training.
 
-- [ ] Streaming token-by-token responses and cancellation.
-- [ ] Internet retrieval / browsing.
-- [ ] File ingestion and retrieval.
-- [ ] Dedicated trained/selected model per role.
-- [ ] Voice / wake word.
-- [ ] Email/calendar/personal connectors.
-- [ ] Terminal/repository/deployment executors.
-- [ ] Proactive assistant automations.
-- [ ] Multi-user authentication and strict account-level memory isolation.
-- [ ] Cloud autoscaling and subscriptions.
-- [ ] Training/fine-tuning/distillation pipeline.
-- [ ] Frontier benchmark evidence against Astra, Claude, Gemini, Grok, and leading open/Chinese models.
+### Files
+- [x] Browser-selected local text/code attachments.
+- [x] Conversation-scoped local attachment storage.
+- [x] Relevant attachment retrieval with bounded context.
+- [x] Attached content is marked as untrusted data in model context.
+- [x] UI upload/list/remove attachment chips.
+- [x] No arbitrary filesystem access.
+
+### UI / reliability
+- [x] Codex-like neutral dark default using Helix blue/cyan/violet accents.
+- [x] Consistent optional light mode.
+- [x] Backend capability negotiation through `/health`.
+- [x] Graceful fallback for stale backend processes instead of raw `Not Found` chat failures.
+- [x] Live role/confidence/reasoning state.
+- [x] Runtime/model/cost/memory/web/files/knowledge status.
+
+## Local validation required before merge
+
+- [ ] Pull the newest feature branch.
+- [ ] Run full pytest suite.
+- [ ] Run `compileall`.
+- [ ] Run `tools/intelligence_eval.py`.
+- [ ] Start the real local Qwen/llama.cpp endpoint.
+- [ ] Confirm streamed text arrives progressively.
+- [ ] Press **Stop** mid-generation and confirm the UI recovers.
+- [ ] Confirm memory add/pin/delete and `Remember that …` recall.
+- [ ] Reload and restore multiple conversations from the sidebar.
+- [ ] Test **Web Auto**, **Web On**, and **Web Off**.
+- [ ] Ask a current-information question and verify visible source links.
+- [ ] Ask a related question with live web off and verify sourced cached knowledge is available.
+- [ ] Inspect and clear learned web knowledge.
+- [ ] Attach a small `.py`, `.md`, or `.txt` file and ask Helix about it.
+- [ ] Remove the attachment and verify it is no longer listed.
+- [ ] Switch Dark ↔ Light and visually inspect both.
+- [ ] Verify `.helix`, `config/local.json`, model weights, and secrets remain untracked.
+- [ ] Do not merge PR #1 until these founder-machine checks pass.
+
+## Still roadmap work
+
+- [ ] Full project/repository workspace with read-only code search.
+- [ ] Controlled editing/diffs/tests and sandboxed terminal tools.
+- [ ] Binary/PDF/image ingestion and multimodal models.
+- [ ] Voice / wake word / speech pipeline.
+- [ ] Email/calendar/personal connectors and proactive tasks.
+- [ ] Dedicated model selection/benchmarking per role.
+- [ ] Multi-user auth, account isolation, export/delete, encryption controls.
+- [ ] Production search provider strategy and stronger network sandbox.
+- [ ] Cloud GPU autoscaling/subscriptions.
+- [ ] Fine-tuning/distillation/training pipeline.
+- [ ] Reproducible frontier benchmark evidence against commercial and leading open models.
 
 ## Safety interpretation
 
-User memory is application state for helping that user. It is not automatically training data.
+User memory, conversation history, attachments, and sourced web knowledge are different stores. None is automatically treated as training data.
 
-The current memory schema includes `user_id`, but the application remains a single-owner local prototype. Do not deploy it as a multi-user service until authentication, authorization, encryption, account deletion/export, rate limits, abuse controls, and tenant-isolation tests exist.
+The current application is still a **single-owner local prototype**. Do not expose it as a public multi-user service yet.
