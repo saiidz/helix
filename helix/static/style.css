@@ -303,3 +303,75 @@ html[data-theme="light"] .memory-backdrop{background:rgba(10,21,72,.20)}
 body,.rail,.intel,.workspace,.workspace-bar,.composer,.memory-drawer,.intent-card,.memory-item,.local-card,.new-task{
   transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease;
 }
+
+
+/* Codex-like neutral dark canvas with Helix brand accents. */
+:root{
+  --bg:#0b0c0f;
+  --rail:#0e0f12;
+  --workspace:#111216;
+  --panel:#16181c;
+  --panel2:#1b1d22;
+  --panel3:#20232a;
+  --bar-bg:rgba(15,16,19,.94);
+  --input-bg:#14161a;
+  --hover-bg:#1c1f24;
+  --border:#272a30;
+  --border2:#373b44;
+  --text:#f4f5f7;
+  --muted:#a2a6ae;
+  --muted2:#717680;
+  --subtle:#555a63;
+  --glow-cyan:rgba(69,199,255,.055);
+  --glow-violet:rgba(108,67,255,.055);
+  --shadow:0 24px 70px rgba(0,0,0,.42);
+}
+
+/* Keep the main shell visually close to Codex: charcoal/black first,
+   blue-cyan-violet only as restrained Helix accents. */
+.workspace{
+  background:
+    radial-gradient(circle at 30% -12%,var(--glow-cyan),transparent 28%),
+    radial-gradient(circle at 78% -8%,var(--glow-violet),transparent 26%),
+    var(--workspace);
+}
+.rail,.intel{background:#0e0f12}
+.workspace-bar{background:var(--bar-bg)}
+.composer-zone{
+  background:linear-gradient(to bottom,transparent,var(--workspace) 32%,var(--workspace) 100%);
+}
+.composer,
+.new-task,
+.local-card,
+.settings[open],
+.route-target,
+.route-source,
+.vision-strip>div,
+.memory-form,
+.memory-item,
+.intent-card{
+  background:var(--panel);
+}
+.intent-card{background:linear-gradient(180deg,#191b20,#15171b)}
+.message.user{background:#1a1c21}
+.memory-drawer{background:#0f1013}
+.toast{background:#181a1f}
+
+/* Dark mode should not turn into a navy wash. Brand color appears on
+   selection, focus, identity, live status and primary actions instead. */
+.nav-item.active,.brain-choice.active{
+  background:linear-gradient(90deg,rgba(47,99,246,.15),rgba(108,67,255,.08));
+}
+.helix-orb,.hero-core,#send,#memory-save{background:var(--brand-gradient)}
+.status-dot.ready,.secure-pill i,.vision-dot.live,.cap-state.live{background:var(--brand-cyan)}
+.brain-dot.engineer{background:var(--brand-blue)}
+.brain-dot.companion{background:var(--brand-cyan)}
+.brain-dot.sage{background:var(--brand-violet)}
+
+/* Optional light theme remains available from the toggle. */
+html[data-theme="light"] .workspace{
+  background:
+    radial-gradient(circle at 24% -8%,rgba(69,199,255,.08),transparent 30%),
+    radial-gradient(circle at 78% 0%,rgba(108,67,255,.06),transparent 28%),
+    var(--workspace);
+}
