@@ -33,6 +33,14 @@
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Voice"><span class="nav-icon">◉</span><span>Voice</span><em>Soon</em></button>
       </nav>
 
+      <section class="recent-chats" aria-label="Recent conversations">
+        <div class="recent-chats-head">
+          <span class="section-label">Recent</span>
+          <button id="refresh-conversations" type="button" title="Refresh conversations">↻</button>
+        </div>
+        <div id="conversation-list" class="conversation-list"></div>
+      </section>
+
       <div class="rail-section">
         <div class="section-label">Brains</div>
         <button class="brain-choice active" type="button" data-role=""><span class="brain-dot auto"></span><span class="brain-copy"><strong>Auto</strong><small>Helix routes the task</small></span></button>
