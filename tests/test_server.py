@@ -287,6 +287,73 @@ def test_knowledge_management_api(tmp_path,monkeypatch):
     assert c.get("/api/knowledge/status",headers=HEADERS).json()["count"] == 0
 
 
+def test_file_upload_and_context_injection(tmp_path,monkeypatch):
+    captured={}
+
+    def fake_complete(profile,messages,max_output):
+        captured["messages"]=messages
+        return Completion("I reviewed the file.",10,5)
+
+    monkeypatch.setattr("helix.server.complete",fake_complete)
+    c=client(tmp_path)
+
+    conversation=c.post(
+        "/api/conversations",
+        headers=HEADERS,
+        json={"title":"File test"},
+    ).json()["conversation"]
+
+    uploaded=c.post(
+        "/api/files",
+        headers=HEADERS,
+        json={
+            "conversation_id":conversation["id"],
+            "name":"app.py",
+            "mime_type":"text/x-python",
+            "content":"def important_function():\n    return 42\n",
+        },
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    file_id=uploaded.json()["file"]["id"]
+
+    listing=c.get(
+        f"/api/files/{conversation['id']}",
+        headers=HEADERS,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["files"][0]["name"] == "app.py"
+
+    response=c.post(
+        "/api/chat",
+        headers={
+            "Authorization":f"Bearer {KEY}",
+            "Idempotency-Key":"file-chat-request-001",
+        },
+        json={
+            "conversation_id":conversation["id"],
+            "messages":[{"role":"user","content":"Review the attached app.py file"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    data=response.json()
+    assert data["files_used"][0]["name"] == "app.py"
+    assert any(
+        "Attached File Context" in message["content"] and "important_function" in message["content"]
+        for message in captured["messages"]
+        if message["role"] == "system"
+    )
+
+    deleted=c.delete(
+        f"/api/files/{conversation['id']}/{file_id}",
+        headers=HEADERS,
+    )
+    assert deleted.status_code == 200
+    assert c.get(
+        f"/api/files/{conversation['id']}",
+        headers=HEADERS,
+    ).json()["files"] == []
+
+
 def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
@@ -298,4 +365,5 @@ def test_model_endpoint_and_policy(tmp_path):
     assert health["capabilities"]["streaming"] is True
     assert health["capabilities"]["web"] is True
     assert health["capabilities"]["knowledge_cache"] is True
+    assert health["capabilities"]["files"] is True
     assert "frame-ancestors 'none'" in c.get("/").headers["Content-Security-Policy"]
