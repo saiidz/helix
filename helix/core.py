@@ -127,7 +127,8 @@ class Settings(StrictModel):
 HELIX_CAPABILITY_CONTEXT = (
     "Current Helix runtime facts: local text inference is connected when the provider mode is local; "
     "persistent local user memory and conversation history are available. A local task list is available only "
-    "when Task Context is supplied; it does not provide background notifications or calendar scheduling yet. "
+    "when Task Context is supplied. The browser UI can show due alerts while Helix is open if the user grants "
+    "notification permission, but Helix does not provide closed-app/background reminders or calendar scheduling yet. "
     "Helix can receive live web research context only when a Web Research system message is present for the current "
     "request; otherwise do not claim that the internet was searched or that facts are current. Local text/code "
     "attachments are available only when an Attached File Context system message is present; this does not grant "
