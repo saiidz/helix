@@ -27,6 +27,7 @@ from .core import (
     reasoning_mode,
     route_decision,
 )
+from .knowledge import KnowledgeStore
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
 from .providers import ProviderError, complete, stream_complete
@@ -66,6 +67,7 @@ def create_app(
 
     ledger = Ledger(ledger_path)
     memory = MemoryStore(memory_path or ledger_path.with_name("memory.sqlite3"))
+    knowledge = KnowledgeStore(ledger_path.with_name("knowledge.sqlite3"))
     gate = threading.BoundedSemaphore(2)
     assets = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=assets), name="static")
@@ -123,6 +125,19 @@ def create_app(
             )
         return "\n\n".join(lines)
 
+
+    def knowledge_context(items: list[dict]) -> str:
+        lines = [
+            "Local Knowledge Cache. These entries came from earlier explicit Helix web research and retain source URLs. "
+            "Treat them as previously retrieved evidence that may become stale. Cite the source URL when relying on them."
+        ]
+        for index, item in enumerate(items[:4], start=1):
+            lines.append(
+                f"[K{index}] {item['title']}\nURL: {item['url']}\n"
+                f"Cached excerpt: {item['content'][:900]}"
+            )
+        return "\n\n".join(lines)
+
     def resolve(req: ChatRequest):
         decision = route_decision(req)
         role = decision.role
@@ -148,6 +163,8 @@ def create_app(
 
         messages = make_messages(role, req)
         memory_hits: list[dict] = []
+        knowledge_hits: list[dict] = []
+        knowledge_learned = 0
         web_sources: list[dict] = []
         web_error: str | None = None
 
@@ -155,6 +172,10 @@ def create_app(
             memory_hits = memory.retrieve(req.messages[-1].content, limit=6)
             if memory_hits:
                 messages.insert(1, {"role": "system", "content": memory_context(memory_hits)})
+
+        knowledge_hits = knowledge.retrieve(req.messages[-1].content, limit=3)
+        if knowledge_hits:
+            messages.insert(1, {"role": "system", "content": knowledge_context(knowledge_hits)})
 
         if req.web_enabled:
             try:
@@ -167,6 +188,11 @@ def create_app(
                     messages.insert(
                         1,
                         {"role": "system", "content": web_context(search_results, documents)},
+                    )
+                    knowledge_learned = knowledge.learn(
+                        req.messages[-1].content,
+                        search_results,
+                        documents,
                     )
                     web_sources = [
                         {
@@ -225,6 +251,8 @@ def create_app(
             mode,
             web_sources,
             web_error,
+            knowledge_hits,
+            knowledge_learned,
         )
 
     @app.get("/")
@@ -249,6 +277,7 @@ def create_app(
                 "files": False,
                 "voice": False,
                 "tools": False,
+                "knowledge_cache": True,
             },
         }
 
@@ -330,6 +359,8 @@ def create_app(
             mode,
             web_sources,
             web_error,
+            knowledge_hits,
+            knowledge_learned,
         ) = resolve(req)
         return {
             "role": role,
@@ -348,6 +379,11 @@ def create_app(
             "web_enabled": req.web_enabled,
             "web_sources": web_sources,
             "web_error": web_error,
+            "knowledge_used": [
+                {"title": item["title"], "url": item["url"]}
+                for item in knowledge_hits
+            ],
+            "knowledge_learned": knowledge_learned,
         }
 
     @app.post("/api/chat", dependencies=[Depends(auth)])
@@ -371,6 +407,8 @@ def create_app(
             mode,
             web_sources,
             web_error,
+            knowledge_hits,
+            knowledge_learned,
         ) = resolve(req)
         fingerprint = hmac.new(
             api_key.encode(),
@@ -465,6 +503,11 @@ def create_app(
                 "web_enabled": req.web_enabled,
                 "web_sources": web_sources,
                 "web_error": web_error,
+                "knowledge_used": [
+                    {"title": item["title"], "url": item["url"]}
+                    for item in knowledge_hits
+                ],
+                "knowledge_learned": knowledge_learned,
             }
         finally:
             gate.release()
@@ -548,6 +591,11 @@ def create_app(
             "web_enabled": req.web_enabled,
             "web_sources": web_sources,
             "web_error": web_error,
+            "knowledge_used": [
+                {"title": item["title"], "url": item["url"]}
+                for item in knowledge_hits
+            ],
+            "knowledge_learned": knowledge_learned,
         }
 
         def events():
