@@ -56,6 +56,17 @@ Checkpoint: **September 18, 2026** · active branch **feat/codex-inspired-ui-v02
 - [x] UI upload/list/remove attachment chips.
 - [x] No arbitrary filesystem access.
 
+### Read-only projects
+- [x] Local project metadata + source-file snapshot store.
+- [x] Browser folder import with text/code extension filtering.
+- [x] Server-side binary/unsafe-path rejection.
+- [x] Batched project imports to reduce request overhead.
+- [x] Project file tree/list in the Projects drawer.
+- [x] Active project persisted locally and shown in the composer.
+- [x] Project-aware relevance retrieval injected as untrusted context.
+- [x] Auto routing biases natural project follow-ups toward Engineer.
+- [x] No shell execution or project mutation authority.
+
 ### UI / reliability
 - [x] Codex-like neutral dark default using Helix blue/cyan/violet accents.
 - [x] Consistent optional light mode.
