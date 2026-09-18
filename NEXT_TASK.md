@@ -2,7 +2,7 @@
 
 ## Objective
 
-Validate the now-useful local stack — streaming, memory, web grounding, sourced learning, files, and conversation history — on the founder Windows PC. After the branch is green, move Engineer toward a **read-only project workspace** without introducing paid inference or unsafe shell authority.
+Validate the now-useful local stack — streaming, memory, web grounding, sourced learning, files, conversation history, and the new **read-only Engineer project workspace** — on the founder Windows PC. After the branch is green, move toward controlled engineering actions without introducing paid inference or unsafe shell authority.
 
 ## Run the local engineering loop
 
@@ -32,18 +32,16 @@ Keep the separate llama.cpp/Qwen server running on port 8080.
 12. Switch Dark/Light modes.
 13. Run `git status --short` and verify runtime/private files are ignored.
 
+## Read-only workspace validation
+
+14. Open **Projects**, create a project, and import a small source folder.
+15. Confirm unsupported binaries are skipped and the file tree/count is correct.
+16. Ask “Where is this handled?” with the project active and confirm Engineer gets relevant project context.
+17. Delete the local project snapshot and confirm no arbitrary local files are modified.
+
 ## Next build after validation
 
-### Engineer read-only workspace
-- explicit local project selection/import;
-- project-scoped file index;
-- code-aware relevance retrieval;
-- repository tree/search view;
-- diff planning without mutation;
-- project memory and architecture notes;
-- no automatic shell execution.
-
-### Then controlled engineering actions
+### Controlled engineering actions
 Only after the read-only workspace is stable:
 
 - sandboxed command execution;
