@@ -117,4 +117,9 @@ def test_model_endpoint_and_policy(tmp_path):
     c=client(tmp_path)
     assert len(c.get("/api/models",headers=HEADERS).json()["profiles"])==3
     assert c.get("/api/policy/deploy",headers=HEADERS).json()["executed"] is False
+    health=c.get("/health").json()
+    assert health["capabilities"]["persistent_memory"] is True
+    assert health["capabilities"]["persistent_conversations"] is True
+    assert health["capabilities"]["routing_scores"] is True
+    assert health["capabilities"]["streaming"] is False
     assert "frame-ancestors 'none'" in c.get("/").headers["Content-Security-Policy"]
