@@ -1,21 +1,147 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Helix · Foundation</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Helix · Local</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
 <body>
-<header><a class="brand" href="/">helix<span> / foundation</span></a><span class="badge">LOCAL PROTOTYPE · v0.1</span></header>
-<main>
-<section class="intro"><div class="eyebrow">ONE INTERFACE. THREE SPECIALTIES.</div><h1>Useful intelligence.<br>Clear boundaries.</h1><p>Talk to Companion, build with Engineer, or reason with Sage. Start locally and see exactly which profile handles your request.</p></section>
-<section class="roles" aria-label="Helix specialties"><article><b>01 / Companion</b><p>Conversation & personal assistance</p></article><article><b>02 / Engineer</b><p>Programming & technical work</p></article><article><b>03 / Sage</b><p>Research & careful reasoning</p></article></section>
-<section class="workspace">
-<aside>
-<h2>Session settings</h2><label for="key">Local access key</label><input id="key" type="password" autocomplete="off" placeholder="Paste the key from your terminal"><p class="note">Kept in this page's memory only. Never paste a provider API key here.</p>
-<label for="role">Specialty</label><select id="role"><option value="">Auto · starter rules</option value="companion">Companion</option><option value="engineer">Engineer</option><option value="sage">Sage</option></select>
-<label for="budget">Maximum model cost / request</label><select id="budget"><option value="0.02">$0.02</option><option value="0.05">$0.05</option><option value="0.10" selected>$0.10</option></select>
-<button id="status" class="secondary">Check connection & costs</button><div id="connection" class="note" aria-live="polite">No model connected yet.</div>
-<div class="boundary"><strong>Private by default</strong><p>Cloud requests are disabled in this interface. No email, calendar, browsing, terminal or deployment tools are connected.</p></div>
-</aside>
-<section class="chat" aria-label="Conversation"><div id="messages" aria-live="polite"><div class="message system"><b>Start here</b><p>The included demo tests routing only; it is not an AI model. Connect your local model in the configuration to generate real answers.</p></div></div>
-<form id="chat-form"><label class="sr-only" for="prompt">Your message</label><textarea id="prompt" rows="3" maxlength="12000" required placeholder="Ask a question, describe a bug, or explore an idea…"></textarea><div class="composer-bottom"><span>Session history clears on reload.</span><button id="send" type="submit">Send request →</button></div></form><div id="error" role="alert"></div>
-</section></section>
-<footer>Built to measure, not overclaim. Model output is unverified. No trained Helix weights are included.</footer>
-</main></body></html>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-row">
+        <div class="brand-mark" aria-hidden="true">H</div>
+        <div>
+          <a class="brand" href="/">Helix</a>
+          <div class="brand-subtitle">local intelligence</div>
+        </div>
+      </div>
+
+      <button id="new-chat" class="new-chat" type="button">
+        <span aria-hidden="true">＋</span>
+        New chat
+      </button>
+
+      <nav class="role-nav" aria-label="Helix specialty">
+        <div class="nav-label">Specialty</div>
+
+        <button class="role-button active" type="button" data-role="">
+          <span class="role-icon">A</span>
+          <span class="role-copy">
+            <strong>Auto</strong>
+            <small>Route by task</small>
+          </span>
+        </button>
+
+        <button class="role-button" type="button" data-role="companion">
+          <span class="role-icon">C</span>
+          <span class="role-copy">
+            <strong>Companion</strong>
+            <small>Conversation & personal help</small>
+          </span>
+        </button>
+
+        <button class="role-button" type="button" data-role="engineer">
+          <span class="role-icon">E</span>
+          <span class="role-copy">
+            <strong>Engineer</strong>
+            <small>Code & technical work</small>
+          </span>
+        </button>
+
+        <button class="role-button" type="button" data-role="sage">
+          <span class="role-icon">S</span>
+          <span class="role-copy">
+            <strong>Sage</strong>
+            <small>Research & deep reasoning</small>
+          </span>
+        </button>
+
+        <select id="role" class="sr-only" aria-label="Specialty">
+          <option value="">Auto</option>
+          <option value="companion">Companion</option>
+          <option value="engineer">Engineer</option>
+          <option value="sage">Sage</option>
+        </select>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="runtime-card">
+        <div class="runtime-head">
+          <span id="runtime-dot" class="status-dot"></span>
+          <span id="runtime-label">Local runtime</span>
+        </div>
+        <div id="connection" class="runtime-detail" aria-live="polite">Checking connection…</div>
+        <button id="status" class="text-button" type="button">Refresh status</button>
+      </div>
+
+      <details class="settings">
+        <summary>Local settings</summary>
+
+        <label for="key">Access key</label>
+        <input id="key" type="password" autocomplete="off" placeholder="Local key">
+
+        <label for="budget">Max model cost / request</label>
+        <select id="budget">
+          <option value="0.02">$0.02</option>
+          <option value="0.05">$0.05</option>
+          <option value="0.10" selected>$0.10</option>
+        </select>
+
+        <div class="privacy-note">
+          <strong>Private by default</strong>
+          <p>Cloud fallback, browsing, email, calendar, terminal and deployment tools are disabled.</p>
+        </div>
+      </details>
+    </aside>
+
+    <main class="main-pane">
+      <header class="topbar">
+        <div class="topbar-left">
+          <strong>Local session</strong>
+          <span id="role-chip" class="chip">Auto</span>
+        </div>
+        <div class="topbar-right">
+          <span class="local-pill"><span class="mini-dot"></span> Local only</span>
+        </div>
+      </header>
+
+      <section class="conversation" aria-label="Conversation">
+        <div id="messages" class="messages" aria-live="polite">
+          <div id="welcome" class="welcome">
+            <div class="welcome-mark">H</div>
+            <h1>What do you want to work on?</h1>
+            <p>One interface for everyday help, coding, and deeper reasoning. Helix keeps the active model visible and stays local by default.</p>
+
+            <div class="quick-prompts" aria-label="Suggested prompts">
+              <button type="button" data-prompt="Help me plan what I should work on today.">Plan my day</button>
+              <button type="button" data-prompt="Review this code with me and help me improve it.">Work on code</button>
+              <button type="button" data-prompt="Think deeply about a hard problem with me.">Reason deeply</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <form id="chat-form" class="composer">
+            <label class="sr-only" for="prompt">Your message</label>
+            <textarea id="prompt" rows="1" maxlength="12000" required placeholder="Message Helix…"></textarea>
+
+            <div class="composer-bottom">
+              <div class="composer-meta">
+                <span id="composer-role">Auto routing</span>
+                <span class="shortcut">Enter to send · Shift+Enter for newline</span>
+              </div>
+              <button id="send" type="submit" aria-label="Send message">Send</button>
+            </div>
+          </form>
+
+          <div id="error" role="alert"></div>
+          <div class="footer-note">Local model output can be wrong. Helix shows which specialty handled each response.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
