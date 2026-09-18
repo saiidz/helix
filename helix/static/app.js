@@ -132,7 +132,10 @@ function cycleWebMode() {
 }
 
 function shouldAutoUseWeb(text) {
-  return /\b(latest|today|current|currently|recent|recently|news|live|right now|this week|this month|search the web|search online|look up|internet|online|2026)\b/i.test(text);
+  return (
+    /https?:\/\//i.test(text) ||
+    /\b(latest|today|current|currently|recent|recently|news|live|right now|this week|this month|search the web|search online|look up|internet|online|2026)\b/i.test(text)
+  );
 }
 
 const roleName = role => {
