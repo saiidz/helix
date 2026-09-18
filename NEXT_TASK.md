@@ -1,21 +1,48 @@
-# Next implementation task · HX-001
+# Next implementation task · HX-002
 
 ## Objective
-Prove that a real, already available local model works through Helix and produces useful text responses within measured hardware and cost constraints. Do not confuse three role prompts with three trained specialties.
 
-## Required inputs
-Actual development machine/OS, RAM/VRAM, exact installed compatible model ID, loopback serving endpoint, and license terms. The user has now selected a Windows PC and created `saiidz/helix`; CPU, RAM, GPU/VRAM, storage and installed model details remain unknown. Do not guess that existing production servers or runners are available for this task.
+Validate the new local memory/conversation layer on the founder Windows PC, then add **streaming responses and cancellation** without introducing paid inference or cloud dependencies.
 
-## Authorized-scope template
-Work only in this Helix project and a local test model endpoint. No cloud/API spending, model downloads, private training data, production credentials, paid subscriptions, repository publication or external fallback unless separately approved.
+## Current inputs already known
 
-## Implementation
-1. Inspect the specific model server's current API and supported context/usage fields.
-2. Configure `config/local.json`; keep it uncommitted if it contains environment-specific details. Never insert provider secrets into JSON.
-3. Run a small fixed prompt set directly and through the adapter. Log revision, backend, quantization, hardware, first-token/full-response timings, memory and actual token usage.
-4. Add tests for any adapter incompatibility. Preserve failure/cost accounting and cloud denial.
-5. Evaluate conversation, coding and reasoning cases separately; identify limitations without inventing scores.
-6. Record evidence in `STATUS.md` and a model card. Do not claim coding tools or personal-data access before those executors exist.
+- Windows founder machine.
+- Local Qwen3 4B Q4_K_M served by llama.cpp.
+- llama.cpp API available on loopback port 8080.
+- Helix app available on loopback port 8765.
+- Three Helix roles: Companion, Engineer, Sage.
+- Local provider cost currently $0.
+- Persistent-memory implementation is now present on the active feature branch.
 
-## Completion
-A reproducible run command, exact local profile, successful actual model responses, measured latency/memory, adapter tests, documented limitations and no unapproved external traffic. The full browser test must also pass on a machine whose browser policy permits the loopback app. Then proceed to HX-002 streaming and cancellation.
+## Validation loop
+
+1. Pull `feat/codex-inspired-ui-v02`.
+2. Run:
+   ```powershell
+   & ".\.venv\Scripts\python.exe" -m pytest -q
+   & ".\.venv\Scripts\python.exe" -m compileall -q helix tests tools
+   ```
+3. Start llama.cpp and Helix.
+4. In the UI, add a memory manually and verify it appears.
+5. Pin/unpin and delete a memory.
+6. Tell Helix: `Remember that my birthday is September 14.`
+7. Start another relevant turn and confirm Helix can retrieve that stored fact.
+8. Reload the browser and confirm the current conversation restores.
+9. Check `git status` for secrets/runtime files before any merge.
+
+## Next implementation after validation
+
+Add streaming/cancellation:
+
+- stream model output from the local compatible provider;
+- show tokens progressively in the chat;
+- allow user cancellation;
+- preserve idempotency and cost accounting;
+- avoid exposing hidden reasoning content;
+- give Companion a fast response path;
+- keep Sage able to use a larger reasoning budget;
+- add tests for disconnects, cancellation, incomplete upstream streams, and uncertain cost accounting.
+
+## Completion criteria
+
+Memory tests and live smoke tests pass on the founder Windows machine, no private memory database or local config is committed, and a streaming implementation is ready in the same engineering loop with zero paid credits.
