@@ -42,6 +42,32 @@ _CACHE_LOCK = threading.Lock()
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_TTL_SECONDS = 300
 
+_WEB_CLIENT_LOCK = threading.Lock()
+_WEB_CLIENT: httpx.Client | None = None
+
+
+def _web_client() -> httpx.Client:
+    """Reuse connections for lower search/fetch latency."""
+    global _WEB_CLIENT
+
+    if _WEB_CLIENT is None:
+        with _WEB_CLIENT_LOCK:
+            if _WEB_CLIENT is None:
+                _WEB_CLIENT = httpx.Client(
+                    timeout=httpx.Timeout(12, connect=4),
+                    trust_env=False,
+                    follow_redirects=False,
+                    limits=httpx.Limits(
+                        max_keepalive_connections=8,
+                        max_connections=12,
+                        keepalive_expiry=30,
+                    ),
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; HelixLocal/0.2; +https://github.com/saiidz/helix)",
+                    },
+                )
+    return _WEB_CLIENT
+
 
 def _cache_get(key: str):
     now = time.monotonic()
@@ -221,22 +247,14 @@ def search_web(query: str, limit: int = 5) -> list[SearchResult]:
         return cached
 
     url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; HelixLocal/0.2; +https://github.com/saiidz/helix)",
-        "Accept": "text/html,application/xhtml+xml",
-    }
-
     try:
-        with httpx.Client(
-            timeout=httpx.Timeout(12, connect=4),
-            trust_env=False,
-            follow_redirects=False,
-            headers=headers,
-        ) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            if len(response.content) > 1_500_000:
-                raise WebError("Search response exceeded size limit")
+        response = _web_client().get(
+            url,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+        )
+        response.raise_for_status()
+        if len(response.content) > 1_500_000:
+            raise WebError("Search response exceeded size limit")
     except httpx.HTTPError as exc:
         raise WebError("Web search is currently unavailable") from exc
 
@@ -270,25 +288,17 @@ def fetch_web_text(url: str, max_chars: int = 12_000) -> WebDocument:
     if cached is not None:
         return cached
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; HelixLocal/0.2; +https://github.com/saiidz/helix)",
-        "Accept": "text/html,text/plain;q=0.9",
-    }
-
     try:
-        with httpx.Client(
-            timeout=httpx.Timeout(12, connect=4),
-            trust_env=False,
-            follow_redirects=False,
-            headers=headers,
-        ) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            content_type = (response.headers.get("content-type") or "").lower()
-            if not any(kind in content_type for kind in ("text/html", "text/plain", "application/xhtml+xml")):
-                raise WebError("Web page is not readable text")
-            if len(response.content) > 2_000_000:
-                raise WebError("Web page exceeded size limit")
+        response = _web_client().get(
+            url,
+            headers={"Accept": "text/html,text/plain;q=0.9"},
+        )
+        response.raise_for_status()
+        content_type = (response.headers.get("content-type") or "").lower()
+        if not any(kind in content_type for kind in ("text/html", "text/plain", "application/xhtml+xml")):
+            raise WebError("Web page is not readable text")
+        if len(response.content) > 2_000_000:
+            raise WebError("Web page exceeded size limit")
     except httpx.HTTPError as exc:
         raise WebError("Web page could not be retrieved") from exc
 
@@ -311,6 +321,47 @@ def fetch_web_text(url: str, max_chars: int = 12_000) -> WebDocument:
 
 
 def research_web(query: str, search_limit: int = 5, fetch_limit: int = 3) -> tuple[list[SearchResult], list[WebDocument]]:
+    direct_urls = []
+    for raw in re.findall(r"https?://[^\\s<>()\"']+", query):
+        url = raw.rstrip(".,;:!?)]}")
+        if url not in direct_urls:
+            direct_urls.append(url)
+        if len(direct_urls) >= 3:
+            break
+
+    if direct_urls:
+        documents: list[WebDocument] = []
+        results: list[SearchResult] = []
+
+        with ThreadPoolExecutor(max_workers=len(direct_urls)) as pool:
+            futures = {
+                pool.submit(fetch_web_text, url, 6000): url
+                for url in direct_urls
+            }
+            fetched: dict[str, WebDocument] = {}
+            for future in as_completed(futures):
+                url = futures[future]
+                try:
+                    fetched[url] = future.result()
+                except Exception:
+                    continue
+
+        for url in direct_urls:
+            doc = fetched.get(url)
+            if not doc:
+                continue
+            documents.append(doc)
+            results.append(
+                SearchResult(
+                    title=doc.title,
+                    url=doc.url,
+                    snippet=doc.text[:500],
+                )
+            )
+
+        if results:
+            return results, documents
+
     results = search_web(query, limit=search_limit)
     targets = results[: max(0, min(fetch_limit, 3))]
     if not targets:
