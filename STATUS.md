@@ -26,12 +26,19 @@ Checkpoint: **September 18, 2026** · active feature branch **feat/codex-inspire
 - [x] Added conversation APIs and memory APIs.
 - [x] Added a Memory management drawer in the UI.
 - [x] Added new unit/integration tests for memory and conversation persistence.
+- [x] Replaced one-keyword routing with scored Companion / Engineer / Sage intent routing.
+- [x] Added routing confidence and per-role intent scores to route/chat responses.
+- [x] Added adaptive inference effort: Sage is deep by default; Engineer escalates to deep for complex architecture/concurrency/security/performance work; routine Companion/Engineer requests stay fast.
+- [x] Added capability-aware system prompts so Helix describes its real memory/local capabilities instead of generic chatbot boilerplate or invented knowledge cutoffs.
+- [x] Added a zero-credit local intelligence evaluation script and wired it into DEV_LOOP_WINDOWS.cmd.
+- [x] Added route confidence + fast/deep mode visibility to the command-center UI.
 
 ## Validation still required before merge
 
 - [ ] Pull the active branch onto the founder Windows PC.
 - [ ] Run the complete Python test suite.
 - [ ] Run compileall.
+- [ ] Run the new zero-credit intelligence eval and confirm all routing/mode cases pass.
 - [ ] Start the real local Qwen/llama.cpp server.
 - [ ] Smoke-test memory add / pin / delete.
 - [ ] Smoke-test `Remember that my birthday is …` then ask about that fact in a later turn.
