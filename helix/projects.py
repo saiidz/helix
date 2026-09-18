@@ -19,6 +19,20 @@ MAX_PROJECT_FILES = 400
 MAX_FILE_CHARS = 350_000
 MAX_CONTEXT_CHARS = 18_000
 
+TEXT_SUFFIXES = {
+    ".txt", ".md", ".markdown", ".json", ".yaml", ".yml", ".toml", ".ini",
+    ".cfg", ".csv", ".tsv", ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx",
+    ".jsx", ".java", ".c", ".h", ".cpp", ".hpp", ".cs", ".go", ".rs", ".rb",
+    ".php", ".swift", ".kt", ".kts", ".sql", ".sh", ".ps1", ".bat", ".cmd",
+    ".html", ".css", ".scss", ".xml", ".vue", ".svelte", ".graphql", ".gql",
+    ".env.example", ".properties", ".gradle",
+}
+TEXT_NAMES = {
+    "dockerfile", "makefile", "procfile", "gemfile", "rakefile", "license",
+    "readme", "agents.md", "claude.md", ".gitignore", ".dockerignore",
+    ".editorconfig",
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -35,6 +49,29 @@ def _tokens(text: str) -> set[str]:
         for token in re.findall(r"[a-zA-Z0-9_./#:+-]{3,}", text.lower())
         if token not in stop
     }
+
+
+def _is_text_path(path: str) -> bool:
+    name = Path(path).name.lower()
+    if name in TEXT_NAMES:
+        return True
+    if name.endswith(".env.example"):
+        return True
+    return Path(name).suffix.lower() in TEXT_SUFFIXES
+
+
+def _looks_textual(content: str) -> bool:
+    if "\x00" in content:
+        return False
+    sample = content[:5000]
+    if not sample:
+        return False
+    controls = sum(
+        1
+        for ch in sample
+        if ord(ch) < 32 and ch not in {"\n", "\r", "\t", "\f", "\b"}
+    )
+    return controls / max(1, len(sample)) < 0.01
 
 
 def _language(path: str) -> str:
@@ -168,14 +205,21 @@ class ProjectStore:
             raise ValueError("Project not found")
 
         normalized = path.replace("\\", "/").strip("/")
-        if not normalized or len(normalized) > 500:
-            raise ValueError("Project file path is invalid")
+        parts = [part for part in normalized.split("/") if part]
+        if (
+            not normalized
+            or len(normalized) > 500
+            or ".." in parts
+            or not _is_text_path(normalized)
+        ):
+            raise ValueError("Project file type or path is not supported")
 
-        content = content.replace("\x00", "")
         if not content:
             raise ValueError("Project file is empty")
         if len(content) > MAX_FILE_CHARS:
             raise ValueError("Project file is too large")
+        if not _looks_textual(content):
+            raise ValueError("Project file does not look like text/code")
 
         with self.connect() as c:
             file_count = int(
