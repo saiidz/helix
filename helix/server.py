@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import secrets
 import threading
 from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -28,7 +29,7 @@ from .core import (
 )
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
-from .providers import ProviderError, complete
+from .providers import ProviderError, complete, stream_complete
 from .web import WebError, research_web
 
 
@@ -243,7 +244,7 @@ def create_app(
                 "persistent_conversations": True,
                 "routing_scores": True,
                 "adaptive_reasoning": True,
-                "streaming": False,
+                "streaming": True,
                 "web": True,
                 "files": False,
                 "voice": False,
@@ -467,6 +468,162 @@ def create_app(
             }
         finally:
             gate.release()
+
+    @app.post("/api/chat/stream", dependencies=[Depends(auth)])
+    def chat_stream(
+        req: ChatRequest,
+        idempotency_key: str = Header(
+            min_length=16,
+            max_length=128,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ):
+        (
+            role,
+            reason,
+            profile,
+            messages,
+            _,
+            estimate,
+            memory_hits,
+            decision,
+            mode,
+            web_sources,
+            web_error,
+        ) = resolve(req)
+
+        fingerprint = hmac.new(
+            api_key.encode(),
+            req.model_dump_json().encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not gate.acquire(blocking=False):
+            raise HTTPException(429, "Two requests are already running; try again after completion")
+
+        try:
+            ledger.reserve(
+                idempotency_key,
+                fingerprint,
+                role,
+                profile.model_id,
+                estimate,
+                dollars_to_micro(settings.monthly_budget_usd),
+            )
+        except DuplicateRequest as exc:
+            gate.release()
+            raise HTTPException(409, str(exc)) from exc
+        except BudgetExceeded as exc:
+            gate.release()
+            raise HTTPException(402, str(exc)) from exc
+
+        explicit_memory = None
+        if req.memory_enabled:
+            explicit_memory = memory.capture_explicit(req.messages[-1].content)
+
+        meta = {
+            "type": "meta",
+            "role": role,
+            "reason": reason,
+            "routing_confidence": decision.confidence,
+            "routing_scores": decision.scores,
+            "reasoning_mode": mode,
+            "model_id": profile.model_id,
+            "provider_mode": profile.kind,
+            "request_id": idempotency_key,
+            "conversation_id": req.conversation_id,
+            "memory_used": [
+                {"id": item["id"], "kind": item["kind"]}
+                for item in memory_hits
+            ],
+            "memory_saved": (
+                {
+                    "id": explicit_memory["id"],
+                    "kind": explicit_memory["kind"],
+                    "content": explicit_memory["content"],
+                }
+                if explicit_memory
+                else None
+            ),
+            "web_enabled": req.web_enabled,
+            "web_sources": web_sources,
+            "web_error": web_error,
+        }
+
+        def events():
+            text_parts: list[str] = []
+            finished = False
+            actual = None
+
+            try:
+                yield json.dumps(meta, separators=(",", ":")) + "\n"
+
+                for chunk in stream_complete(profile, messages, req.max_output_tokens):
+                    if chunk.text:
+                        text_parts.append(chunk.text)
+                        yield json.dumps(
+                            {"type": "delta", "text": chunk.text},
+                            separators=(",", ":"),
+                        ) + "\n"
+
+                    if chunk.done:
+                        if chunk.input_tokens is not None and chunk.output_tokens is not None:
+                            actual = microdollars(
+                                profile,
+                                chunk.input_tokens,
+                                chunk.output_tokens,
+                            )
+
+                ledger.finish(idempotency_key, actual)
+                finished = True
+                answer = "".join(text_parts)
+
+                if req.conversation_id:
+                    memory.save_message(
+                        req.conversation_id,
+                        "user",
+                        req.messages[-1].content,
+                    )
+                    if answer:
+                        memory.save_message(
+                            req.conversation_id,
+                            "assistant",
+                            answer,
+                        )
+
+                yield json.dumps(
+                    {
+                        "type": "done",
+                        "model_cost_usd": (estimate if actual is None else actual) / 1000000,
+                        "usage_reported_by_provider": actual is not None,
+                        "answer_verified": False,
+                    },
+                    separators=(",", ":"),
+                ) + "\n"
+            except GeneratorExit:
+                ledger.hold_uncertain_failure(idempotency_key)
+                raise
+            except Exception as exc:
+                ledger.hold_uncertain_failure(idempotency_key)
+                message = (
+                    str(exc)
+                    if isinstance(exc, ProviderError)
+                    else "Streaming request failed; cost reservation retained for reconciliation"
+                )
+                yield json.dumps(
+                    {"type": "error", "detail": message},
+                    separators=(",", ":"),
+                ) + "\n"
+            finally:
+                if not finished:
+                    ledger.hold_uncertain_failure(idempotency_key)
+                gate.release()
+
+        return StreamingResponse(
+            events(),
+            media_type="application/x-ndjson",
+            headers={"X-Accel-Buffering": "no"},
+        )
 
     @app.get("/api/meter", dependencies=[Depends(auth)])
     def meter():
