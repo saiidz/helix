@@ -5,6 +5,13 @@ const byId = id => document.getElementById(id);
 let chatHistory = [];
 let previousRole = null;
 let conversationId = window.localStorage.getItem("helixConversationId") || null;
+let runtimeFeatures = {
+  persistent_memory: false,
+  persistent_conversations: false,
+  routing_scores: false,
+  adaptive_reasoning: false
+};
+let staleBackendWarningShown = false;
 
 const THEME_KEY = "helixTheme";
 
@@ -57,14 +64,28 @@ async function api(path, method = "GET", body = null, id = null) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       typeof data.detail === "string"
         ? data.detail
         : "Request rejected (" + response.status + ")."
     );
+    error.status = response.status;
+    throw error;
   }
 
   return data;
+}
+
+async function readHealth() {
+  const response = await fetch("/health", { cache: "no-store" });
+  if (!response.ok) throw new Error("Helix health check failed.");
+  return response.json();
+}
+
+function warnStaleBackend() {
+  if (staleBackendWarningShown) return;
+  staleBackendWarningShown = true;
+  toast("Helix UI is newer than the running backend. Chat will still work; restart Helix to enable memory and the newest routing.");
 }
 
 function toast(text) {
@@ -81,21 +102,34 @@ function removeWelcome() {
 }
 
 async function ensureConversation() {
+  if (!runtimeFeatures.persistent_conversations) return null;
   if (conversationId) return conversationId;
 
-  const data = await api(
-    "/api/conversations",
-    "POST",
-    { title: "New conversation" }
-  );
+  try {
+    const data = await api(
+      "/api/conversations",
+      "POST",
+      { title: "New conversation" }
+    );
 
-  conversationId = data.conversation.id;
-  window.localStorage.setItem("helixConversationId", conversationId);
-  return conversationId;
+    conversationId = data.conversation.id;
+    window.localStorage.setItem("helixConversationId", conversationId);
+    return conversationId;
+  } catch (error) {
+    if (error.status === 404) {
+      runtimeFeatures.persistent_conversations = false;
+      runtimeFeatures.persistent_memory = false;
+      conversationId = null;
+      window.localStorage.removeItem("helixConversationId");
+      warnStaleBackend();
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function loadConversation() {
-  if (!conversationId) return;
+  if (!runtimeFeatures.persistent_conversations || !conversationId) return;
 
   try {
     const data = await api("/api/conversations/" + encodeURIComponent(conversationId));
@@ -128,6 +162,11 @@ async function loadConversation() {
 }
 
 function openMemoryDrawer() {
+  if (!runtimeFeatures.persistent_memory) {
+    warnStaleBackend();
+    return;
+  }
+
   byId("memory-drawer").hidden = false;
   byId("memory-backdrop").hidden = false;
   refreshMemories();
@@ -192,6 +231,8 @@ function renderMemoryList(memories) {
 }
 
 async function refreshMemories() {
+  if (!runtimeFeatures.persistent_memory) return;
+
   try {
     const data = await api("/api/memories?limit=100");
     renderMemoryList(data.memories || []);
@@ -414,10 +455,32 @@ async function refreshStatus() {
   try {
     const results = await Promise.all([
       api("/api/models"),
-      api("/api/meter")
+      api("/api/meter"),
+      readHealth()
     ]);
     const models = results[0];
     const meter = results[1];
+    const health = results[2];
+
+    const advertised = health.capabilities || {};
+    const legacyMemory = health.memory === "local_sqlite";
+
+    runtimeFeatures = {
+      persistent_memory: Boolean(advertised.persistent_memory || legacyMemory),
+      persistent_conversations: Boolean(advertised.persistent_conversations || legacyMemory),
+      routing_scores: Boolean(advertised.routing_scores),
+      adaptive_reasoning: Boolean(advertised.adaptive_reasoning)
+    };
+
+    const memoryBadge = byId("memory-nav")?.querySelector("em");
+    if (memoryBadge) {
+      memoryBadge.textContent = runtimeFeatures.persistent_memory ? "Ready" : "Restart";
+    }
+
+    if (!runtimeFeatures.persistent_conversations) {
+      conversationId = null;
+      window.localStorage.removeItem("helixConversationId");
+    }
 
     const local = models.profiles.length > 0 &&
       models.profiles.every(profile => profile.kind === "local");
@@ -428,7 +491,9 @@ async function refreshStatus() {
     dot.classList.remove("error");
     dot.classList.add("ready");
     byId("runtime-label").textContent = local ? "Local runtime ready" : "Runtime ready";
-    byId("runtime-short").textContent = primaryModel || "Connected";
+    byId("runtime-short").textContent =
+      (primaryModel || "Connected") +
+      (runtimeFeatures.persistent_memory ? "" : " · restart for v0.2 backend");
     byId("model-name").textContent = primaryModel || "—";
     byId("provider-mode").textContent = local ? "Local" : "Mixed";
     byId("runtime-cost").textContent = "$" + meter.model_cost_usd.toFixed(6);
@@ -573,12 +638,18 @@ byId("chat-form").addEventListener("submit", async event => {
     messages: current,
     role: selectedRole,
     previous_role: previousRole,
-    conversation_id: conversationId,
-    memory_enabled: true,
     allow_external: false,
     max_output_tokens: selectedRole === "sage" ? 1024 : 512,
     max_cost_usd: byId("budget").value
   };
+
+  if (runtimeFeatures.persistent_conversations && conversationId) {
+    payload.conversation_id = conversationId;
+  }
+
+  if (runtimeFeatures.persistent_memory) {
+    payload.memory_enabled = true;
+  }
 
   message("You", text, "user");
   const pending = pendingMessage(selectedRole);
@@ -608,7 +679,7 @@ byId("chat-form").addEventListener("submit", async event => {
         " · unverified"
     );
 
-    if (data.memory_saved) {
+    if (data.memory_saved && runtimeFeatures.persistent_memory) {
       toast("Helix saved that to your private local memory.");
       refreshMemories();
     }
