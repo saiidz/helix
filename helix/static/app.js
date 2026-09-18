@@ -13,7 +13,8 @@ let runtimeFeatures = {
   streaming: false,
   web: false,
   files: false,
-  projects: false
+  projects: false,
+  tasks: false
 };
 let staleBackendWarningShown = false;
 let currentAbortController = null;
@@ -24,6 +25,7 @@ const PROJECT_KEY = "helixProjectId";
 let webMode = window.localStorage.getItem(WEB_MODE_KEY) || "auto";
 let activeProjectId = window.localStorage.getItem(PROJECT_KEY) || null;
 let activeProject = null;
+let taskFilter = "open";
 
 function applyTheme(theme) {
   const nextTheme = theme === "light" ? "light" : "dark";
@@ -484,6 +486,114 @@ function openProjectsDrawer() {
 function closeProjectsDrawer() {
   byId("projects-drawer").hidden = true;
   byId("projects-backdrop").hidden = true;
+}
+
+function openTasksDrawer() {
+  if (!runtimeFeatures.tasks) {
+    warnStaleBackend();
+    return;
+  }
+
+  byId("tasks-drawer").hidden = false;
+  byId("tasks-backdrop").hidden = false;
+  refreshTasks();
+}
+
+function closeTasksDrawer() {
+  byId("tasks-drawer").hidden = true;
+  byId("tasks-backdrop").hidden = true;
+}
+
+function renderTasks(tasks) {
+  const list = byId("task-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!tasks.length) {
+    const empty = document.createElement("div");
+    empty.className = "task-empty";
+    empty.textContent = taskFilter === "done"
+      ? "No completed tasks yet."
+      : taskFilter === "all"
+        ? "No tasks yet."
+        : "No open tasks. Add one or say “Add task …” in chat.";
+    list.append(empty);
+    return;
+  }
+
+  for (const task of tasks) {
+    const card = document.createElement("article");
+    card.className = "task-item";
+    card.classList.toggle("done", task.status === "done");
+    card.dataset.taskId = task.id;
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "task-toggle";
+    toggle.dataset.taskAction = "toggle";
+    toggle.dataset.done = task.status === "done" ? "true" : "false";
+    toggle.setAttribute(
+      "aria-label",
+      task.status === "done" ? "Reopen task" : "Complete task"
+    );
+    toggle.textContent = task.status === "done" ? "✓" : "";
+
+    const copy = document.createElement("div");
+    copy.className = "task-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = task.title;
+
+    const details = document.createElement("p");
+    details.textContent = task.details || "";
+    details.hidden = !task.details;
+
+    const meta = document.createElement("small");
+    if (task.due_at) {
+      const due = new Date(task.due_at);
+      meta.textContent = "Due " + (Number.isNaN(due.getTime()) ? task.due_at : due.toLocaleString());
+    } else {
+      meta.textContent = task.status === "done" ? "Completed" : "No due time";
+    }
+
+    copy.append(title, details, meta);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "task-delete";
+    remove.dataset.taskAction = "delete";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "Delete " + task.title);
+
+    card.append(toggle, copy, remove);
+    list.append(card);
+  }
+}
+
+async function refreshTasks() {
+  if (!runtimeFeatures.tasks) return;
+
+  try {
+    const data = await api(
+      "/api/tasks?status=" + encodeURIComponent(taskFilter) + "&limit=100"
+    );
+    renderTasks(data.tasks || []);
+
+    const open = taskFilter === "open"
+      ? (data.tasks || []).length
+      : (await api("/api/tasks?status=open&limit=100")).tasks.length;
+
+    const badge = byId("tasks-nav")?.querySelector("em");
+    const cap = byId("task-cap-label");
+    if (badge) badge.textContent = open ? String(open) : "Ready";
+    if (cap) cap.textContent = open ? open + " open" : "Ready";
+  } catch (error) {
+    const list = byId("task-list");
+    if (list) {
+      list.innerHTML = '<div class="task-empty">Could not load tasks</div>';
+    }
+    toast("Tasks: " + error.message);
+  }
 }
 
 async function importProjectFolder(fileList) {
@@ -1056,6 +1166,10 @@ async function streamChat(payload, selectedRole) {
             toast("Helix saved that to your private local memory.");
             refreshMemories();
           }
+          if (event.task_saved) {
+            toast("Helix added “" + event.task_saved.title + "” to your task list. No notification was scheduled.");
+            refreshTasks();
+          }
         } else if (event.type === "delta") {
           live.text += event.text || "";
           live.body.textContent = live.text;
@@ -1220,7 +1334,8 @@ async function refreshStatus() {
       streaming: Boolean(advertised.streaming),
       web: Boolean(advertised.web),
       files: Boolean(advertised.files),
-      projects: Boolean(advertised.projects)
+      projects: Boolean(advertised.projects),
+      tasks: Boolean(advertised.tasks)
     };
 
     setWebMode(webMode, false);
@@ -1243,6 +1358,13 @@ async function refreshStatus() {
     if (projectState) projectState.classList.toggle("live", runtimeFeatures.projects);
     if (projectLabel) projectLabel.textContent = runtimeFeatures.projects ? "Ready" : "Restart";
     if (projectBadge) projectBadge.textContent = runtimeFeatures.projects ? "Ready" : "Restart";
+
+    const taskState = byId("task-cap-state");
+    const taskLabel = byId("task-cap-label");
+    const taskBadge = byId("tasks-nav")?.querySelector("em");
+    if (taskState) taskState.classList.toggle("live", runtimeFeatures.tasks);
+    if (taskLabel) taskLabel.textContent = runtimeFeatures.tasks ? "Ready" : "Restart";
+    if (taskBadge) taskBadge.textContent = runtimeFeatures.tasks ? "Ready" : "Restart";
 
     const memoryBadge = byId("memory-nav")?.querySelector("em");
     if (memoryBadge) {
@@ -1338,6 +1460,9 @@ byId("theme-toggle").addEventListener("click", toggleTheme);
 byId("projects-nav").addEventListener("click", openProjectsDrawer);
 byId("projects-close").addEventListener("click", closeProjectsDrawer);
 byId("projects-backdrop").addEventListener("click", closeProjectsDrawer);
+byId("tasks-nav").addEventListener("click", openTasksDrawer);
+byId("tasks-close").addEventListener("click", closeTasksDrawer);
+byId("tasks-backdrop").addEventListener("click", closeTasksDrawer);
 byId("memory-nav").addEventListener("click", openMemoryDrawer);
 byId("memory-close").addEventListener("click", closeMemoryDrawer);
 byId("memory-backdrop").addEventListener("click", closeMemoryDrawer);
@@ -1453,6 +1578,92 @@ byId("project-delete").addEventListener("click", async () => {
     await refreshProjects();
   } catch (error) {
     toast("Projects: " + error.message);
+  }
+});
+
+byId("task-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!runtimeFeatures.tasks) {
+    warnStaleBackend();
+    return;
+  }
+
+  const title = byId("task-title").value.trim();
+  if (!title) return;
+
+  const dueValue = byId("task-due").value;
+  let dueAt = null;
+
+  if (dueValue) {
+    const parsed = new Date(dueValue);
+    if (!Number.isNaN(parsed.getTime())) {
+      dueAt = parsed.toISOString();
+    }
+  }
+
+  byId("task-create").disabled = true;
+
+  try {
+    await api("/api/tasks", "POST", {
+      title,
+      details: byId("task-details").value.trim(),
+      due_at: dueAt
+    });
+
+    byId("task-title").value = "";
+    byId("task-details").value = "";
+    byId("task-due").value = "";
+    taskFilter = "open";
+
+    document.querySelectorAll("[data-task-filter]").forEach(button => {
+      button.classList.toggle("active", button.dataset.taskFilter === taskFilter);
+    });
+
+    toast("Task added.");
+    await refreshTasks();
+  } catch (error) {
+    toast("Tasks: " + error.message);
+  } finally {
+    byId("task-create").disabled = false;
+  }
+});
+
+document.querySelectorAll("[data-task-filter]").forEach(button => {
+  button.addEventListener("click", () => {
+    taskFilter = button.dataset.taskFilter;
+    document.querySelectorAll("[data-task-filter]").forEach(item => {
+      item.classList.toggle("active", item === button);
+    });
+    refreshTasks();
+  });
+});
+
+byId("task-list").addEventListener("click", async event => {
+  const button = event.target.closest("[data-task-action]");
+  if (!button) return;
+
+  const card = button.closest("[data-task-id]");
+  if (!card) return;
+
+  const taskId = card.dataset.taskId;
+
+  try {
+    if (button.dataset.taskAction === "delete") {
+      await api("/api/tasks/" + encodeURIComponent(taskId), "DELETE");
+      toast("Task deleted.");
+    } else {
+      const done = button.dataset.done !== "true";
+      await api(
+        "/api/tasks/" + encodeURIComponent(taskId),
+        "PATCH",
+        { done }
+      );
+      toast(done ? "Task completed." : "Task reopened.");
+    }
+
+    await refreshTasks();
+  } catch (error) {
+    toast("Tasks: " + error.message);
   }
 });
 
@@ -1687,6 +1898,11 @@ byId("chat-form").addEventListener("submit", async event => {
       refreshMemories();
     }
 
+    if (data.task_saved && runtimeFeatures.tasks) {
+      toast("Helix added “" + data.task_saved.title + "” to your task list. No notification was scheduled.");
+      refreshTasks();
+    }
+
     chatHistory = [
       ...current,
       { role: "assistant", content: data.text }
@@ -1735,6 +1951,7 @@ byId("chat-form").addEventListener("submit", async event => {
         await refreshAttachments();
         await refreshConversationList();
         await refreshProjects();
+        await refreshTasks();
         if (activeProjectId && runtimeFeatures.projects) {
           await loadProject(activeProjectId, false).catch(() => {
             activeProjectId = null;
