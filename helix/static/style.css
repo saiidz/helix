@@ -707,3 +707,63 @@ html[data-theme="light"] .knowledge-item{
 html[data-theme="light"] .knowledge-item a{
   color:#2454d9;
 }
+
+
+/* Local text/code attachment chips */
+.file-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-height:0;
+}
+.file-chips:empty{display:none}
+.file-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:220px;
+  padding:5px 7px;
+  margin-bottom:7px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--panel2);
+  color:var(--muted);
+  font-size:8px;
+}
+.file-chip::before{
+  content:"F";
+  display:grid;
+  place-items:center;
+  width:16px;
+  height:16px;
+  flex:0 0 auto;
+  border-radius:5px;
+  background:var(--brand-gradient-soft);
+  color:var(--brand-cyan);
+  font-size:7px;
+  font-weight:800;
+}
+.file-chip-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.file-chip button{
+  width:17px;
+  height:17px;
+  padding:0;
+  border:0;
+  border-radius:5px;
+  background:transparent;
+  color:var(--muted2);
+  cursor:pointer;
+  line-height:1;
+}
+.file-chip button:hover{
+  background:var(--hover-bg);
+  color:var(--text);
+}
+html[data-theme="light"] .file-chip{
+  background:#f5f8ff;
+  border-color:#d7e0f0;
+}
