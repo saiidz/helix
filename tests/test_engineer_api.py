@@ -19,7 +19,7 @@ PREFIX = "/api/engineer-agent"
 def connected(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "main.py").write_text("value = 1\n")
+    (root / "main.py").write_bytes(b"value = 1\n")
     import hashlib
     sha = hashlib.sha256(b"value = 1\n").hexdigest()
     actions = [
