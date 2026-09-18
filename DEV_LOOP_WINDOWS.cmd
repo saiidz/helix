@@ -12,7 +12,7 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo [1/5] Fetching the latest feature branch...
+echo [1/6] Fetching the latest feature branch...
 git fetch origin
 if errorlevel 1 goto failed
 
@@ -23,23 +23,28 @@ git pull --ff-only
 if errorlevel 1 goto failed
 
 echo.
-echo [2/5] Running tests...
+echo [2/6] Running tests...
 ".venv\Scripts\python.exe" -m pytest -q
 if errorlevel 1 goto failed
 
 echo.
-echo [3/5] Compiling Python sources...
+echo [3/6] Compiling Python sources...
 ".venv\Scripts\python.exe" -m compileall -q helix tests tools
 if errorlevel 1 goto failed
 
 echo.
-echo [4/5] Checking for accidentally staged local/private files...
+echo [4/6] Running Helix intelligence eval...
+".venv\Scripts\python.exe" tools\intelligence_eval.py
+if errorlevel 1 goto failed
+
+echo.
+echo [5/6] Checking for accidentally staged local/private files...
 git status --short
 echo.
 echo Review the status above. .helix, config\local.json, .venv and model weights must stay untracked.
 
 echo.
-echo [5/5] Checking the local model server...
+echo [6/6] Checking the local model server...
 powershell -NoProfile -Command "try { $m=Invoke-RestMethod 'http://127.0.0.1:8080/v1/models' -TimeoutSec 2; Write-Host 'Local model server: READY'; exit 0 } catch { Write-Host 'Local model server: NOT RUNNING on port 8080'; exit 2 }"
 if errorlevel 2 (
     echo.
