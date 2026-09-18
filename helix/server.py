@@ -71,6 +71,10 @@ class ProjectFileCreate(BaseModel):
     content: str = Field(min_length=1, max_length=350000)
 
 
+class ProjectFileBatchCreate(BaseModel):
+    files: list[ProjectFileCreate] = Field(min_length=1, max_length=25)
+
+
 def create_app(
     settings: Settings,
     api_key: str,
@@ -107,7 +111,10 @@ def create_app(
                 request.url.path == "/api/files"
                 or (
                     request.url.path.startswith("/api/projects/")
-                    and request.url.path.endswith("/files")
+                    and (
+                        request.url.path.endswith("/files")
+                        or request.url.path.endswith("/files/batch")
+                    )
                 )
             )
             max_body = 1200000 if is_large_text_upload else 64000
@@ -490,6 +497,24 @@ def create_app(
         except ValueError as exc:
             status = 404 if str(exc) == "Project not found" else 422
             raise HTTPException(status, str(exc)) from exc
+
+    @app.post("/api/projects/{project_id}/files/batch", dependencies=[Depends(auth)])
+    def add_project_files_batch(project_id: str, body: ProjectFileBatchCreate):
+        added = []
+        skipped = []
+
+        for item in body.files:
+            try:
+                added.append(projects.add_file(project_id, item.path, item.content))
+            except ValueError as exc:
+                if str(exc) == "Project not found":
+                    raise HTTPException(404, str(exc)) from exc
+                skipped.append({"path": item.path, "reason": str(exc)})
+
+        return {
+            "added": added,
+            "skipped": skipped,
+        }
 
     @app.delete("/api/projects/{project_id}", dependencies=[Depends(auth)])
     def delete_project(project_id: str):
