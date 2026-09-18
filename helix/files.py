@@ -166,6 +166,21 @@ class FileStore:
             )
             return result.rowcount == 1
 
+
+    def clear_conversation(self, conversation_id: str) -> int:
+        with self.connect() as c:
+            count = int(
+                c.execute(
+                    "SELECT COUNT(*) FROM attachments WHERE conversation_id=?",
+                    (conversation_id,),
+                ).fetchone()[0]
+            )
+            c.execute(
+                "DELETE FROM attachments WHERE conversation_id=?",
+                (conversation_id,),
+            )
+        return count
+
     def retrieve(
         self,
         conversation_id: str,
