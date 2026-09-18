@@ -1,46 +1,61 @@
 # Helix implementation status
 
-Checkpoint: **September 17, 2026** · package **0.1.0**.
+Checkpoint: **September 18, 2026** · active feature branch **feat/codex-inspired-ui-v02**.
 
-## Completed in this task
+## Working baseline already proven on the founder Windows PC
 
-- [x] Read the two existing Helix research reports and correct the technical-markup/investment-return confusion.
-- [x] Check the connected GitHub installation for an existing `helix` repository; none returned. No unrelated repository was modified.
-- [x] Create the main Markdown roadmap, source register, original project instructions and AWS/evaluation/security/runbook documents.
-- [x] Implement a local single-owner FastAPI gateway, three role profiles, browser assets and a compatible text adapter.
-- [x] Implement atomic spending reservations, idempotency rejection, uncertain-failure handling and provider usage reconciliation.
-- [x] Keep default mode free of external inference calls and label simulated responses as demo.
-- [x] Implement and run the reproducible 36-month economics model, including follow-on capital.
-- [x] Run **55 automated tests: passed in 0.91 seconds**. See `evidence/tests-final.txt`.
-- [x] Run `python -m compileall -q helix tools tests`: passed.
-- [x] Test the HTTP adapter against a real loopback HTTP fixture server, not an AI model.
-- [x] Render and inspect desktop/mobile static layouts; no horizontal overflow at 1440px and 390px. See `evidence/ui-preview.json` and PNGs.
+- [x] Local llama.cpp server loaded a real Qwen3 4B Q4_K_M checkpoint.
+- [x] Local model API responded through `http://127.0.0.1:8080/v1`.
+- [x] Helix connected to the local model and returned real generated answers.
+- [x] Companion / Engineer / Sage profiles all point to local inference in the founder configuration.
+- [x] Qwen thinking behavior was measured: `/no_think` returns visible fast answers, while thinking can consume the output budget before final content.
+- [x] Local model cost ledger remains $0 provider cost for the founder local configuration.
+- [x] GitHub repository `saiidz/helix` was initialized and pushed.
 
-## Explicitly not completed
+## In the current PR branch
 
-- [ ] Live browser end-to-end integration: system Chromium blocked the loopback URL with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. Browser policy was not changed. Static previews do not count as this test passing.
-- [ ] Real model installation, GPU benchmark or generated-answer quality evaluation.
-- [ ] Native vendor adapters for OpenAI Responses, Claude Messages, Gemini Live or full voice APIs.
-- [ ] Web retrieval, email/calendar connectors, long-term semantic memory, voice/wake word, app actions or coding execution.
-- [ ] Multi-tenant SaaS security, billing integration, cloud provisioning or GPU autoscaling.
-- [ ] Training/fine-tuning, broad GitHub data ingestion, comparative model benchmarks or claims of superiority.
-- [ ] GitHub push/PR, production deployment, model-provider payment or infrastructure purchase.
+- [x] Reworked the browser experience into a Helix command center rather than a generic chat landing page.
+- [x] Added visible Auto / Companion / Engineer / Sage routing state.
+- [x] Added runtime/model/cost/capability status.
+- [x] Added richer chat rendering and interaction states.
+- [x] Added SQLite-backed private user memory.
+- [x] Added memory types, pinning, importance, source, timestamps, and soft deletion.
+- [x] Added conservative explicit capture for `Remember that …`.
+- [x] Added relevant-memory retrieval and injection into model context.
+- [x] Added SQLite conversation persistence.
+- [x] Added conversation APIs and memory APIs.
+- [x] Added a Memory management drawer in the UI.
+- [x] Added new unit/integration tests for memory and conversation persistence.
 
-## Evidence interpretation
+## Validation still required before merge
 
-Tested Python: **3.13.5**. Main dependency versions are pinned in requirements files to the test environment, not claimed to be the newest or independently security-audited. Browser preview utilities require optional Playwright plus Chromium; they are not runtime dependencies.
+- [ ] Pull the active branch onto the founder Windows PC.
+- [ ] Run the complete Python test suite.
+- [ ] Run compileall.
+- [ ] Start the real local Qwen/llama.cpp server.
+- [ ] Smoke-test memory add / pin / delete.
+- [ ] Smoke-test `Remember that my birthday is …` then ask about that fact in a later turn.
+- [ ] Reload the browser and confirm the conversation restores.
+- [ ] Verify no secret, `config/local.json`, model weight, or `.helix` database is staged.
+- [ ] Visually inspect desktop command-center layout before merging PR #1.
 
-The first test run passed 46 checks. Eight economics checks and one database-connection lifecycle check brought the final suite to 55. The final count is the release evidence. A fixture provider response is not a learned-model answer. A source citation or roadmap checkbox is not proof of an implemented feature.
+## Not yet implemented
 
-Cloud-related price references are dated inputs, not live account quotations. No model/contract is activated by the comparator registry. Commercial projections are scenario arithmetic, not observed revenue or promised returns.
+- [ ] Streaming token-by-token responses and cancellation.
+- [ ] Internet retrieval / browsing.
+- [ ] File ingestion and retrieval.
+- [ ] Dedicated trained/selected model per role.
+- [ ] Voice / wake word.
+- [ ] Email/calendar/personal connectors.
+- [ ] Terminal/repository/deployment executors.
+- [ ] Proactive assistant automations.
+- [ ] Multi-user authentication and strict account-level memory isolation.
+- [ ] Cloud autoscaling and subscriptions.
+- [ ] Training/fine-tuning/distillation pipeline.
+- [ ] Frontier benchmark evidence against Astra, Claude, Gemini, Grok, and leading open/Chinese models.
 
-## Next gate
+## Safety interpretation
 
-**HX-001 — connect and measure one genuine local model** using the exact machine, compatible serving endpoint, checkpoint and license. Preserve all local-only and no-spend defaults. Then add streaming/cancellation and first read-only useful workflows, with tests, rather than adding a large unmeasured model fleet.
+User memory is application state for helping that user. It is not automatically training data.
 
-
-## Windows preparation addendum
-
-The user selected a Windows PC for initial development and supplied `saiidz/helix`. The connector confirmed that repository was public and empty at inspection. A private repository is recommended before uploading the commercial project; visibility was not changed.
-
-Added three Windows launchers, a Windows/GitHub onboarding guide and expanded ignore rules for credentials, runtime state and model weights. The original roadmap and application remain in place. See `evidence/windows-preparation.txt` for the new Python-suite run. Windows launchers remain unexecuted on Windows here. No remote commit or push was performed.
+The current memory schema includes `user_id`, but the application remains a single-owner local prototype. Do not deploy it as a multi-user service until authentication, authorization, encryption, account deletion/export, rate limits, abuse controls, and tenant-isolation tests exist.
