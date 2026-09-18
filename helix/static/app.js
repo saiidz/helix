@@ -723,13 +723,14 @@ async function refreshStatus() {
     const results = await Promise.all([
       api("/api/models"),
       api("/api/meter"),
-      readHealth(),
-      api("/api/knowledge/status")
+      readHealth()
     ]);
     const models = results[0];
     const meter = results[1];
     const health = results[2];
-    const knowledgeStatus = results[3];
+    const knowledgeStatus = health.capabilities?.knowledge_cache
+      ? await api("/api/knowledge/status").catch(() => ({ count: 0 }))
+      : { count: 0 };
 
     const advertised = health.capabilities || {};
     const legacyMemory = health.memory === "local_sqlite";
