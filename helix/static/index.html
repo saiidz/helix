@@ -194,6 +194,18 @@
 
       <div class="memory-tip">Tip: you can also say <strong>“Remember that …”</strong> in chat.</div>
       <div id="memory-list" class="memory-list"></div>
+
+      <div class="knowledge-manager">
+        <div class="knowledge-manager-head">
+          <div>
+            <span class="section-label">Learned from web</span>
+            <h3>Sourced knowledge</h3>
+          </div>
+          <button id="knowledge-clear" class="knowledge-clear" type="button">Clear all</button>
+        </div>
+        <p class="knowledge-manager-copy">Helix only keeps web knowledge with its source URL. This is local retrieval memory, not model-weight training.</p>
+        <div id="knowledge-list" class="knowledge-list"></div>
+      </div>
     </aside>
 
     <div id="memory-backdrop" class="memory-backdrop" hidden></div>
