@@ -747,16 +747,24 @@ async function streamChat(payload, selectedRole) {
   setGenerationState(true);
 
   const requestId = crypto.randomUUID();
-  const response = await fetch("/api/chat/stream", {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer " + key,
-      "Content-Type": "application/json",
-      "Idempotency-Key": requestId
-    },
-    body: JSON.stringify(payload),
-    signal: currentAbortController.signal
-  });
+  let response;
+
+  try {
+    response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + key,
+        "Content-Type": "application/json",
+        "Idempotency-Key": requestId
+      },
+      body: JSON.stringify(payload),
+      signal: currentAbortController.signal
+    });
+  } catch (error) {
+    currentAbortController = null;
+    setGenerationState(false);
+    throw error;
+  }
 
   if (!response.ok) {
     let detail = "Streaming request rejected (" + response.status + ").";
@@ -764,6 +772,9 @@ async function streamChat(payload, selectedRole) {
       const data = await response.json();
       if (typeof data.detail === "string") detail = data.detail;
     } catch (_) {}
+
+    currentAbortController = null;
+    setGenerationState(false);
     throw new Error(detail);
   }
 
