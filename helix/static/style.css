@@ -609,3 +609,20 @@ html[data-theme="light"] .sources{
   border-color:var(--border);
 }
 html[data-theme="light"] .sources a{color:#2454d9}
+
+
+/* Web Auto mode: connected but not forced on every request. */
+.web-toggle.auto{
+  color:var(--muted);
+  border-color:rgba(47,99,246,.28);
+  background:linear-gradient(135deg,rgba(69,199,255,.07),rgba(108,67,255,.05));
+}
+.web-toggle.auto span:first-child{
+  background:var(--brand-blue);
+  box-shadow:0 0 8px rgba(47,99,246,.35);
+}
+html[data-theme="light"] .web-toggle.auto{
+  color:#39527e;
+  background:linear-gradient(135deg,rgba(69,199,255,.10),rgba(108,67,255,.06));
+  border-color:rgba(47,99,246,.20);
+}
