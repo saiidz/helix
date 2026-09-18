@@ -23,6 +23,8 @@ Implemented on that branch:
 - inspect + clear controls for learned web knowledge;
 - local text/code attachments selected by the user in the browser;
 - relevant file snippets injected as untrusted context;
+- **read-only project workspaces**: create a project, explicitly import a source folder, browse the indexed file tree, and keep that project active as Engineer context;
+- project folder imports are batched for lower HTTP overhead and binaries/unsafe paths are rejected;
 - dark Codex-like default UI plus optional Helix-branded light mode;
 - local cost ledger and no automatic paid-provider fallback.
 
@@ -63,6 +65,20 @@ Supported in this build:
 - prompt-injection boundary: attached content is treated as untrusted user data.
 
 Binary files, PDFs, images, repository mutation, and terminal execution are still separate roadmap work.
+
+## Read-only projects
+
+Projects are explicit local snapshots, not silent filesystem access.
+
+- Click **Projects** and create a project.
+- Import a folder using the browser folder picker.
+- Helix accepts supported source/text files only and skips likely binaries.
+- The active project is shown in the composer.
+- Natural follow-ups inside an active project bias Auto routing toward Engineer.
+- Relevant project files are inserted as untrusted context with file paths.
+- Helix may analyze and propose diffs, but it still cannot mutate the project or run commands.
+
+This provides a useful engineering workspace before any shell/write authority is introduced.
 
 ## Windows quick run
 
