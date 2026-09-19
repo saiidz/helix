@@ -317,7 +317,7 @@ class ProjectStore:
             )
         )
 
-        scored: list[tuple[float, sqlite3.Row]] = []
+        scored: list[tuple[tuple[int, float, float], sqlite3.Row]] = []
         for index, row in enumerate(rows):
             path_tokens = _tokens(row["path"])
             body_tokens = _tokens(row["content"][:25_000])
@@ -339,7 +339,8 @@ class ProjectStore:
             recency = max(0.0, 0.5 - index * 0.01)
 
             if overlap or general_project_request:
-                scored.append((overlap + priority + recency, row))
+                # Relevance comes first. Overview-file and recency bonuses only break ties.
+                scored.append(((overlap, priority, recency), row))
 
         selected_rows = [
             row
