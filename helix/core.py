@@ -9,6 +9,7 @@ from datetime import date
 from decimal import Decimal, ROUND_CEILING
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -48,7 +49,10 @@ class ChatRequest(StrictModel):
         pattern=r"^[A-Za-z0-9_-]+$",
     )
     memory_enabled: bool = True
+    # web_enabled is retained for older clients. New clients send web_mode so
+    # Auto can be decided server-side instead of trusting browser heuristics.
     web_enabled: bool = False
+    web_mode: Literal["legacy", "off", "auto", "on"] = "legacy"
     allow_external: bool = False
     max_output_tokens: int = Field(default=512, ge=1, le=2048)
     max_cost_usd: Decimal = Field(default=Decimal("0.10"), ge=0, le=10)
