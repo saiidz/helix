@@ -56,6 +56,11 @@ class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", min_length=1, max_length=120)
 
 
+class ConversationMessageCreate(BaseModel):
+    role: str = Field(pattern=r"^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=12000)
+
+
 class FileCreate(BaseModel):
     conversation_id: str = Field(
         min_length=8,
@@ -503,6 +508,13 @@ def create_app(
         if conversation is None:
             raise HTTPException(404, "Conversation not found")
         return {"conversation": conversation}
+
+    @app.post("/api/conversations/{conversation_id}/messages", dependencies=[Depends(auth)])
+    def append_conversation_message(conversation_id: str, body: ConversationMessageCreate):
+        if memory.get_conversation(conversation_id) is None:
+            raise HTTPException(404, "Conversation not found")
+        memory.save_message(conversation_id, body.role, body.content)
+        return {"saved": True}
 
     @app.delete("/api/conversations/{conversation_id}", dependencies=[Depends(auth)])
     def delete_conversation(conversation_id: str):
