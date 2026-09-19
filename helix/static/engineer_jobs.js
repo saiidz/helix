@@ -116,8 +116,8 @@
     try { return JSON.stringify(value, null, 2); } catch (_) { return String(value); }
   }
 
-  function appendEvents(events, reset = false) {
-    if (selectedHistory) return;
+  function appendEvents(events, reset = false, force = false) {
+    if (selectedHistory && !force) return;
     const target = drawer.querySelector("#engineer-events");
     if (reset) target.innerHTML = "";
     for (const event of events || []) {
@@ -282,9 +282,9 @@
       const events = (data.job.events || []).map(item => ({ id: item.seq, kind: item.kind, value: item.value }));
       const target = drawer.querySelector("#engineer-events");
       target.innerHTML = "";
-      appendEvents(events, false);
+      appendEvents(events, false, true);
       if (data.job.result) {
-        appendEvents([{ id: "result", kind: "final_result", value: data.job.result }], false);
+        appendEvents([{ id: "result", kind: "final_result", value: data.job.result }], false, true);
       }
     } catch (error) {
       drawer.querySelector("#engineer-runtime").querySelector("small").textContent = error.message;

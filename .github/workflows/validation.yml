@@ -47,5 +47,7 @@ jobs:
         run: python -m pytest -vv -o faulthandler_timeout=45
       - name: Compile application, tools and tests
         run: python -m compileall -q helix tests tools
+      - name: Check Engineer Jobs JavaScript
+        run: node --check helix/static/engineer_jobs.js
       - name: Offline routing and reasoning evaluation
         run: python -m tools.intelligence_eval
