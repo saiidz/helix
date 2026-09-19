@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/engineer_jobs.css">
   <link rel="stylesheet" href="/static/product.css">
+  <link rel="stylesheet" href="/static/follow_through.css">
+  <script src="/static/follow_through.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/engineer_jobs.js" defer></script>
 </head>
@@ -31,6 +33,7 @@
       <nav class="primary-nav" aria-label="Helix navigation">
         <button class="nav-item active" type="button"><span class="nav-icon">◫</span><span>Chat</span></button>
         <button id="projects-nav" class="nav-item" type="button"><span class="nav-icon">⌘</span><span>Projects</span><em>Ready</em></button>
+        <button id="follow-through-nav" class="nav-item" type="button"><span class="nav-icon">↳</span><span>Follow-through</span><em>Local</em></button>
         <button id="tasks-nav" class="nav-item" type="button"><span class="nav-icon">✓</span><span>Tasks</span><em>Ready</em></button>
         <button id="memory-nav" class="nav-item" type="button"><span class="nav-icon">◎</span><span>Memory</span><em>Ready</em></button>
         <button id="engineer-jobs-nav" class="nav-item" type="button"><span class="nav-icon">◇</span><span>Engineer</span><em id="engineer-jobs-nav-state">Off</em></button>
@@ -80,6 +83,7 @@
         <div class="workspace-title"><span class="crumb">HELIX</span><span class="slash">/</span><strong>Workspace</strong></div>
         <div class="workspace-actions">
           <span class="secure-pill"><i></i> Local model</span>
+          <button id="follow-through-mobile" class="ghost-control" type="button">Track</button>
           <a class="admin-chip" href="/admin">Admin</a>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch color theme" aria-pressed="false">
             <span id="theme-icon" aria-hidden="true">☼</span>
@@ -124,6 +128,7 @@
         </div>
 
         <div class="composer-zone">
+          <div id="active-outcome-chip" hidden></div>
           <form id="chat-form" class="composer">
             <div class="composer-topline">
               <span id="composer-mode"><span class="brain-dot auto"></span> Auto route</span>

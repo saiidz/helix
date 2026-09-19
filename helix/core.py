@@ -48,6 +48,7 @@ class ChatRequest(StrictModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9_-]+$",
     )
+    outcome_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     memory_enabled: bool = True
     # web_enabled is retained for older clients. New clients send web_mode so
     # Auto can be decided server-side instead of trusting browser heuristics.

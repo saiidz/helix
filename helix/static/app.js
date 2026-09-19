@@ -339,6 +339,8 @@ async function loadConversationById(id, announce = true) {
   if (!runtimeFeatures.persistent_conversations) return;
 
   const data = await api("/api/conversations/" + encodeURIComponent(id));
+  // Initial restoration must not discard a tracker form opened during startup.
+  if (conversationId !== data.conversation.id) window.helixFollowThrough?.clear();
   conversationId = data.conversation.id;
   window.localStorage.setItem("helixConversationId", conversationId);
   renderConversationMessages(data.conversation);
@@ -1131,6 +1133,15 @@ function message(label, text, type, meta = "", sources = [], knowledge = []) {
     box.append(tag);
   }
 
+  if (type === "user") {
+    const sourceConversation = conversationId;
+    const track = document.createElement("button");
+    track.type = "button";
+    track.className = "follow-track";
+    track.textContent = "Track this";
+    track.addEventListener("click", () => window.helixFollowThrough?.capture(text, sourceConversation));
+    box.append(track);
+  }
   appendSources(box, sources, "Live web sources");
   appendSources(box, knowledge, "Learned knowledge", "K");
   byId("messages").append(box);
@@ -1402,6 +1413,7 @@ function welcomeMarkup() {
 }
 
 function resetChat() {
+  window.helixFollowThrough?.clear();
   chatHistory = [];
   previousRole = null;
   conversationId = null;
@@ -1907,7 +1919,8 @@ byId("chat-form").addEventListener("submit", async event => {
     { role: "user", content: text }
   ];
 
-  if (looksLikeEngineerWorkspaceTask(text, selectedRole) && window.helixEngineer?.startFromChat) {
+  if (looksLikeEngineerWorkspaceTask(text, selectedRole) && window.helixEngineer?.startFromChat
+      && !window.helixFollowThrough?.activeId()) {
     try {
       const engineer = await window.helixEngineer.startFromChat(text);
       if (engineer.handled) {
@@ -1987,6 +2000,9 @@ byId("chat-form").addEventListener("submit", async event => {
     max_output_tokens: selectedRole === "sage" ? 1024 : 512,
     max_cost_usd: byId("budget").value
   };
+
+  const selectedOutcome = window.helixFollowThrough?.activeId();
+  if (selectedOutcome) payload.outcome_id = selectedOutcome;
 
   if (runtimeFeatures.persistent_conversations && conversationId) {
     payload.conversation_id = conversationId;
