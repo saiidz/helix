@@ -224,10 +224,14 @@ class UtilityChat:
                 "utility_kind": clock_kind,
             }
 
-        memories = self.memory.self_profile_memories(limit=8)
+        memories = self.memory.self_profile_memories(limit=8) if req.memory_enabled else []
         return {
             "role": role,
-            "reason": "Self-profile question; explicit local profile memory, no model or web call",
+            "reason": (
+                "Self-profile question; explicit local profile memory, no model or web call"
+                if req.memory_enabled
+                else "Self-profile question; memory is disabled for this request"
+            ),
             "routing_confidence": 1.0,
             "routing_scores": {name: int(name == role) for name in ("companion", "engineer", "sage")},
             "reasoning_mode": "fast",
@@ -256,6 +260,7 @@ class UtilityChat:
             "actions_executed": [],
             "utility_type": "profile",
             "utility_kind": profile_kind,
+            "utility_memory_enabled": req.memory_enabled,
         }
 
     def reply(self, req: ChatRequest, request_id: str, *, stream: bool = False):
@@ -289,6 +294,7 @@ class UtilityChat:
 
             utility_type = data.pop("utility_type")
             utility_kind = data.pop("utility_kind")
+            utility_memory_enabled = data.pop("utility_memory_enabled", True)
             if utility_type == "clock":
                 result = clock_result(utility_kind)
                 data.update(
@@ -300,8 +306,24 @@ class UtilityChat:
                     tools_used=["clock"],
                 )
             else:
-                memories = self.memory.self_profile_memories(limit=8)
-                result = profile_result(utility_kind, memories)
+                if not utility_memory_enabled:
+                    result = {
+                        "text": (
+                            "Memory is off for this request, so I’m not using your stored profile. "
+                            "Turn Memory on if you want me to answer from it."
+                        ),
+                        "used": [],
+                        "found": False,
+                    }
+                    method = "local_memory_disabled"
+                    scope = "Stored profile memory was not accessed because memory is disabled"
+                    tools = []
+                else:
+                    memories = self.memory.self_profile_memories(limit=8)
+                    result = profile_result(utility_kind, memories)
+                    method = "local_memory"
+                    scope = "Explicit user profile/preference memories stored locally; not externally verified"
+                    tools = ["memory"]
                 data.update(
                     text=result["text"],
                     profile_memory_found=result["found"],
@@ -311,9 +333,9 @@ class UtilityChat:
                     ],
                     memory_matches=len(result["used"]),
                     answer_verified=False,
-                    verification_method="local_memory",
-                    verification_scope="Explicit user profile/preference memories stored locally; not externally verified",
-                    tools_used=["memory"],
+                    verification_method=method,
+                    verification_scope=scope,
+                    tools_used=tools,
                 )
 
             data.update(
