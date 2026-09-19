@@ -170,6 +170,25 @@ class MemoryStore:
             ).fetchall()
         return [self._memory_dict(row) for row in rows]
 
+    def self_profile_memories(self, limit: int = 8) -> list[dict]:
+        """Return explicit self-profile context without keyword matching.
+
+        Identity questions such as "who am I?" contain almost no lexical overlap
+        with stored facts. Only profile and preference memories are included here;
+        project, episodic, other-person and miscellaneous memories are deliberately
+        excluded from this self-summary path.
+        """
+        limit = max(1, min(limit, 20))
+        with self.connect() as c:
+            rows = c.execute(
+                """SELECT * FROM memories
+                   WHERE user_id=? AND active=1 AND kind IN ('profile','preference')
+                   ORDER BY pinned DESC, importance DESC, updated_at DESC
+                   LIMIT ?""",
+                (self.user_id, limit),
+            ).fetchall()
+        return [self._memory_dict(row) for row in rows]
+
     def delete_memory(self, memory_id: str) -> bool:
         with self.connect() as c:
             result = c.execute(

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0A1330">
+  <title>HELIX Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/static/branding/helix-app-icon.svg">
+  <link rel="stylesheet" href="/static/admin.css">
+  <script src="/static/admin.js" defer></script>
+</head>
+<body>
+  <header class="admin-top">
+    <a href="/" class="admin-brand"><img src="/static/branding/helix-logo.svg" alt="HELIX"></a>
+    <div class="admin-title"><strong>Admin</strong><span>local control center</span></div>
+    <a class="back-link" href="/">Back to HELIX</a>
+  </header>
+
+  <main class="admin-shell">
+    <section class="admin-hero">
+      <div>
+        <span class="eyebrow">OWNER CONTROLS</span>
+        <h1>Keep the product simple.<br>Keep the controls here.</h1>
+        <p>Models, web access, Engineer permissions, safety state, local storage and diagnostics are separated from the end-user chat experience.</p>
+      </div>
+      <div id="admin-health" class="health-pill">Checking HELIX…</div>
+    </section>
+
+    <div id="admin-error" class="admin-error" hidden></div>
+
+    <section class="admin-grid">
+      <article class="admin-card">
+        <div class="card-head"><div><span class="card-kicker">Runtime</span><h2>AI engines</h2></div><span id="runtime-state" class="state">—</span></div>
+        <div id="model-list" class="model-list"></div>
+        <dl class="facts">
+          <div><dt>Model cost</dt><dd id="model-cost">$0.000000</dd></div>
+          <div><dt>Streaming</dt><dd id="streaming-state">—</dd></div>
+          <div><dt>Tool-first routing</dt><dd id="tool-first-state">—</dd></div>
+        </dl>
+      </article>
+
+      <article class="admin-card">
+        <div class="card-head"><div><span class="card-kicker">Internet</span><h2>Live research</h2></div><span id="web-state" class="state">—</span></div>
+        <p class="card-copy">Web Auto is decided on the server for current/fresh questions. Web Off always wins.</p>
+        <dl class="facts">
+          <div><dt>Public web connector</dt><dd id="web-connector">—</dd></div>
+          <div><dt>Server Web Auto</dt><dd id="server-auto">—</dd></div>
+          <div><dt>Sourced local cache</dt><dd id="knowledge-count">—</dd></div>
+        </dl>
+      </article>
+
+      <article class="admin-card wide">
+        <div class="card-head"><div><span class="card-kicker">Engineer</span><h2>Workspace & execution</h2></div><span id="engineer-state" class="state">—</span></div>
+        <div id="workspace-path" class="path-box">No workspace connected</div>
+        <dl class="facts three">
+          <div><dt>Actions</dt><dd id="actions-state">—</dd></div>
+          <div><dt>Persistent jobs</dt><dd id="jobs-state">—</dd></div>
+          <div><dt>OS sandbox</dt><dd id="sandbox-state">—</dd></div>
+        </dl>
+        <p class="card-copy">Select the workspace when starting HELIX. This keeps repository authority out of the browser request body.</p>
+      </article>
+
+      <article class="admin-card safety-card wide">
+        <div class="card-head"><div><span class="card-kicker">Safety</span><h2>Emergency Lockdown</h2></div><span id="lock-state" class="state">—</span></div>
+        <p id="lock-copy" class="card-copy">Lockdown disables Engineer actions and persists across HELIX restarts. Already-completed effects are not undone.</p>
+        <div class="safety-actions">
+          <button id="lockdown" class="danger" type="button">Activate Emergency Lockdown</button>
+          <code>RESET_HELIX_LOCKDOWN.cmd</code>
+        </div>
+        <p class="fine-print">Reset is intentionally not available through the web API. Use a separate interactive local terminal.</p>
+      </article>
+
+      <article class="admin-card">
+        <div class="card-head"><div><span class="card-kicker">Storage</span><h2>Local data</h2></div></div>
+        <dl class="facts">
+          <div><dt>Memory</dt><dd id="memory-state">—</dd></div>
+          <div><dt>Conversations</dt><dd id="conversation-state">—</dd></div>
+          <div><dt>Knowledge cache</dt><dd id="cache-state">—</dd></div>
+        </dl>
+      </article>
+
+      <article class="admin-card">
+        <div class="card-head"><div><span class="card-kicker">Product</span><h2>Experience</h2></div></div>
+        <dl class="facts">
+          <div><dt>Clock utility</dt><dd id="clock-state">—</dd></div>
+          <div><dt>Calculator</dt><dd id="calculator-state">—</dd></div>
+          <div><dt>Voice</dt><dd id="voice-state">—</dd></div>
+        </dl>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

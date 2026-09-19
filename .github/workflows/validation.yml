@@ -2,7 +2,7 @@ name: HELIX validation
 
 on:
   push:
-    branches: [main, feat/codex-inspired-ui-v02, feat/helix-useful-v03, feat/helix-lockdown-v03]
+    branches: [main, feat/codex-inspired-ui-v02, feat/helix-useful-v03, feat/helix-lockdown-v03, feat/helix-product-v04]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -47,7 +47,10 @@ jobs:
         run: python -m pytest -vv -o faulthandler_timeout=45
       - name: Compile application, tools and tests
         run: python -m compileall -q helix tests tools
-      - name: Check Engineer Jobs JavaScript
-        run: node --check helix/static/engineer_jobs.js
+      - name: Check product JavaScript
+        run: |
+          node --check helix/static/app.js
+          node --check helix/static/engineer_jobs.js
+          node --check helix/static/admin.js
       - name: Offline routing and reasoning evaluation
         run: python -m tools.intelligence_eval

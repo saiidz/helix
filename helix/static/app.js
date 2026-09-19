@@ -14,7 +14,10 @@ let runtimeFeatures = {
   web: false,
   files: false,
   projects: false,
-  tasks: false
+  tasks: false,
+  clock: false,
+  server_web_auto: false,
+  tool_first_routing: false
 };
 let staleBackendWarningShown = false;
 let currentAbortController = null;
@@ -136,6 +139,29 @@ function shouldAutoUseWeb(text) {
     /https?:\/\//i.test(text) ||
     /\b(latest|today|current|currently|recent|recently|news|live|right now|this week|this month|search the web|search online|look up|internet|online|2026)\b/i.test(text)
   );
+}
+
+function looksLikeEngineerWorkspaceTask(text, selectedRole) {
+  const action = /\b(read|inspect|open|find|search|fix|change|edit|modify|apply|write|create|run|test|build|debug|refactor|implement|commit|diff|review)\b/i.test(text);
+  const repoObject = (
+    /(?:^|\s)[\w./\\-]+\.(?:py|js|mjs|cjs|ts|tsx|jsx|java|go|rs|rb|php|cs|c|h|cpp|hpp|sql|html|css|json|ya?ml|toml|md)(?:\s|$|[,.?])/i.test(text) ||
+    /\b(file|files|repo|repository|codebase|source|src|test|tests|branch|git|function|class|module|package)\b/i.test(text)
+  );
+  const modeAllows = selectedRole === "engineer" || selectedRole === null;
+  return modeAllows && action && repoObject;
+}
+
+function verificationLabel(data) {
+  const method = data?.verification_method;
+  if (method === "local_memory_disabled") return "memory off";
+  if (method === "local_memory") return "memory · local";
+  if (data?.answer_verified) {
+    if (method === "host_clock") return "verified · host clock";
+    if (method === "deterministic_exact_arithmetic") return "verified · calculator";
+    return "verified";
+  }
+  if (data?.web_sources?.length) return "web grounded";
+  return "unverified";
 }
 
 const roleName = role => {
@@ -1274,12 +1300,17 @@ async function streamChat(payload, selectedRole) {
       ? doneEvent.model_cost_usd.toFixed(6)
       : "0.000000";
 
+    const evidence = verificationLabel({
+      answer_verified: doneEvent?.answer_verified,
+      verification_method: doneEvent?.verification_method,
+      web_sources: live.sources
+    });
+
     live.meta.textContent =
       providerMode + " · " + modelId + " · $" + cost +
       (metaEvent?.memory_used?.length ? " · " + metaEvent.memory_used.length + " memory" : "") +
       (live.files.length ? " · " + live.files.length + " file" + (live.files.length === 1 ? "" : "s") : "") +
-      (live.sources.length ? " · web grounded" : "") +
-      " · unverified";
+      " · " + evidence;
 
     appendSources(live.box, live.sources, "Live web sources");
     appendSources(live.box, live.knowledge, "Learned knowledge", "K");
@@ -1357,21 +1388,14 @@ function setRole(role) {
 function welcomeMarkup() {
   return [
     '<div id="welcome" class="welcome">',
-    '<div class="hero-orb" aria-hidden="true"><div class="hero-ring ring-a"></div><div class="hero-ring ring-b"></div><div class="hero-core">H</div></div>',
-    '<div class="eyebrow">YOUR UNIVERSAL AI · LOCAL FIRST</div>',
-    '<h1>What should Helix handle?</h1>',
-    '<p class="welcome-copy">Ask naturally. Helix chooses Companion, Engineer, or Sage, keeps the route visible, and only uses capabilities you have actually connected.</p>',
+    '<div class="eyebrow">LOCAL-FIRST · WEB-CONNECTED · TOOL-AWARE</div>',
+    '<h1>Ask. Build. Research.</h1>',
+    '<p class="welcome-copy">HELIX routes simple facts to trusted local tools, current questions to live web research, and repository work to the Engineer workspace—then uses the model for the reasoning that actually needs a model.</p>',
     '<div class="intent-grid">',
-    '<button type="button" class="intent-card" data-role-prompt="companion" data-prompt="Help me organize what I need to do today and prioritize it."><span class="intent-icon companion">C</span><span><strong>Run my day</strong><small>Plan, organize, explain, remember context</small></span><b>→</b></button>',
-    '<button type="button" class="intent-card" data-role-prompt="engineer" data-prompt="Help me work on my software project. Start by asking what I want to build or fix."><span class="intent-icon engineer">E</span><span><strong>Build something</strong><small>Code, debug, architecture, systems</small></span><b>→</b></button>',
-    '<button type="button" class="intent-card" data-role-prompt="sage" data-prompt="Help me reason deeply about a difficult problem."><span class="intent-icon sage">S</span><span><strong>Think deeply</strong><small>Research, compare, reason, verify</small></span><b>→</b></button>',
-    "</div>",
-    '<div class="vision-strip">',
-    '<div><span class="vision-dot live"></span><strong>Local AI</strong><small>Connected</small></div>',
-    '<div><span class="vision-dot live"></span><strong>Long-term memory</strong><small>Connected</small></div>',
-    '<div><span class="vision-dot live"></span><strong>Internet</strong><small>Auto + opt-in</small></div>',
-    '<div><span class="vision-dot"></span><strong>Voice</strong><small>Planned</small></div>',
-    '<div><span class="vision-dot"></span><strong>Actions</strong><small>Planned</small></div>',
+    '<button type="button" class="intent-card" data-role-prompt="companion" data-prompt="Help me plan today around my open tasks and priorities."><span class="intent-icon companion">C</span><span><strong>Plan my day</strong><small>Tasks, memory and everyday decisions</small></span><b>→</b></button>',
+    '<button type="button" class="intent-card" data-role-prompt="engineer" data-prompt="Inspect my connected repository and help me fix the highest-value issue you can verify."><span class="intent-icon engineer">E</span><span><strong>Work on my code</strong><small>Read, debug, edit and verify with approval</small></span><b>→</b></button>',
+    '<button type="button" class="intent-card" data-role-prompt="sage" data-prompt="Research the latest developments in a topic I give you and cite live sources."><span class="intent-icon sage">S</span><span><strong>Research live</strong><small>Current web sources and deeper synthesis</small></span><b>→</b></button>',
+    '<button type="button" class="intent-card" data-role-prompt="companion" data-prompt="Tell me what time it is now, then help me decide what to do next."><span class="intent-icon companion">✓</span><span><strong>Just make it work</strong><small>Clock, calculator and tool-first answers</small></span><b>→</b></button>',
     "</div>",
     "</div>"
   ].join("");
@@ -1417,7 +1441,10 @@ async function refreshStatus() {
       web: Boolean(advertised.web),
       files: Boolean(advertised.files),
       projects: Boolean(advertised.projects),
-      tasks: Boolean(advertised.tasks)
+      tasks: Boolean(advertised.tasks),
+      clock: Boolean(advertised.clock),
+      server_web_auto: Boolean(advertised.server_web_auto),
+      tool_first_routing: Boolean(advertised.tool_first_routing)
     };
 
     setWebMode(webMode, false);
@@ -1880,6 +1907,78 @@ byId("chat-form").addEventListener("submit", async event => {
     { role: "user", content: text }
   ];
 
+  if (looksLikeEngineerWorkspaceTask(text, selectedRole) && window.helixEngineer?.startFromChat) {
+    try {
+      const engineer = await window.helixEngineer.startFromChat(text);
+      if (engineer.handled) {
+        message("You", text, "user");
+        byId("prompt").value = "";
+        autoGrow();
+
+        const assistantText =
+          "I opened the connected Engineer workspace and started a real repository job. " +
+          "I can inspect/search the workspace without pretending. Any edit or command will wait for review.";
+        message(
+          "Helix Engineer",
+          assistantText,
+          "assistant",
+          "Engineer Agent · " + (engineer.workspace || "workspace connected") + " · evidence pending"
+        );
+
+        if (runtimeFeatures.persistent_conversations && conversationId) {
+          await api("/api/conversations/" + conversationId + "/messages", "POST", {
+            role: "user",
+            content: text
+          }).catch(() => null);
+          await api("/api/conversations/" + conversationId + "/messages", "POST", {
+            role: "assistant",
+            content: assistantText
+          }).catch(() => null);
+        }
+
+        chatHistory = [...current, { role: "assistant", content: assistantText }];
+        previousRole = "engineer";
+        byId("send").disabled = false;
+        refreshConversationList();
+        byId("prompt").focus();
+        return;
+      }
+
+      if (engineer.reason === "workspace_missing") {
+        message("You", text, "user");
+        byId("prompt").value = "";
+        autoGrow();
+        const assistantText =
+          "Engineer needs a connected repository for that request. Start HELIX with START_HELIX_AGENT.cmd \"C:\\path\\to\\repo\". " +
+          "The workspace path stays an owner/admin decision instead of being granted by chat.";
+        message("Helix Engineer", assistantText, "assistant", "Engineer · workspace not connected");
+        chatHistory = [...current, { role: "assistant", content: assistantText }];
+        previousRole = "engineer";
+        byId("send").disabled = false;
+        byId("prompt").focus();
+        return;
+      }
+
+      if (engineer.reason === "locked") {
+        message("You", text, "user");
+        byId("prompt").value = "";
+        autoGrow();
+        const assistantText = "Engineer actions are currently locked by the owner. Open Admin to inspect the safety state.";
+        message("Helix Engineer", assistantText, "assistant", "Engineer · locked");
+        chatHistory = [...current, { role: "assistant", content: assistantText }];
+        previousRole = "engineer";
+        byId("send").disabled = false;
+        byId("prompt").focus();
+        return;
+      }
+    } catch (engineerError) {
+      byId("error").textContent = engineerError.message;
+      byId("send").disabled = false;
+      byId("prompt").focus();
+      return;
+    }
+  }
+
   const payload = {
     messages: current,
     role: selectedRole,
@@ -1901,14 +2000,12 @@ byId("chat-form").addEventListener("submit", async event => {
     payload.project_id = activeProjectId;
   }
 
-  const autoWeb = runtimeFeatures.web && shouldAutoUseWeb(text);
   if (runtimeFeatures.web) {
-    payload.web_enabled =
-      webMode === "on" ||
-      (webMode === "auto" && autoWeb);
+    payload.web_mode = webMode;
+    payload.web_enabled = webMode === "on";
 
-    if (payload.web_enabled && webMode === "auto") {
-      toast("Helix automatically enabled live web research for this current-information request.");
+    if (webMode === "auto" && shouldAutoUseWeb(text)) {
+      toast("HELIX will verify this with live web research if current evidence is needed.");
     }
   }
 
@@ -1961,10 +2058,7 @@ byId("chat-form").addEventListener("submit", async event => {
         (data.files_used && data.files_used.length
           ? " · " + data.files_used.length + " file" + (data.files_used.length === 1 ? "" : "s")
           : "") +
-        (data.web_sources && data.web_sources.length
-          ? " · web grounded"
-          : "") +
-        " · unverified",
+        " · " + verificationLabel(data),
       data.web_sources || [],
       data.knowledge_used || []
     );
