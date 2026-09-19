@@ -1,0 +1,16 @@
+{
+  "scope": "Linux, Python 3.13.5, pytest 9.0.2; Windows env-var limit simulated only in nested fixture tests",
+  "baseline_max_node_id_length": 350044,
+  "baseline_exit_code": 1,
+  "baseline_reproduced": true,
+  "after_max_node_id_length": 78,
+  "after_exit_code": 0,
+  "after_child_summary": "6 passed in 0.02s",
+  "payload_lengths": [
+    350001,
+    350001
+  ],
+  "focused_tests_passed": 10,
+  "native_windows_verified": false,
+  "full_repository_verified": false
+}
