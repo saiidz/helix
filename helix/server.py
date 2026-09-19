@@ -414,6 +414,10 @@ def create_app(
     def index():
         return FileResponse(assets / "index.html")
 
+    @app.get("/admin", include_in_schema=False)
+    def admin():
+        return FileResponse(assets / "admin.html")
+
     @app.get("/health")
     def health():
         return {
