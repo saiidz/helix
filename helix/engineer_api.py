@@ -86,8 +86,9 @@ class AgentSession:
             self.decision_event.clear()
             self.pending = {"id": secrets.token_urlsafe(24), "kind": kind, "preview": preview}
             self.status = "waiting_for_approval"
+            # Keep the event cursor atomic with exposing the pending approval.
+            self.emit("approval_requested", {"kind": kind})
         self.jobs.set_status(self.job_id, "waiting_for_approval")
-        self.emit("approval_requested", {"kind": kind})
 
         deadline = time.monotonic() + 600
         while not self.decision_event.wait(.1):
@@ -121,8 +122,10 @@ class AgentSession:
             ):
                 raise ToolError("Approval is absent, expired, cancelled, or already used")
             self.answer = decision == "approve"
+            # Record the decision event before waking the worker so status
+            # snapshots cannot observe the transition without its receipt.
+            self.emit("approval_decision", {"decision": decision})
             self.decision_event.set()
-        self.emit("approval_decision", {"decision": decision})
 
     def stop(self, reason: str = "user"):
         alive = False
