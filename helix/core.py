@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .runtime_context import runtime_context
+
 
 class Role(StrEnum):
     COMPANION = "companion"
@@ -310,7 +312,9 @@ def reasoning_mode(role: Role, req: ChatRequest) -> str:
 
 
 def make_messages(role: Role, req: ChatRequest) -> list[dict]:
-    messages = [{"role": "system", "content": PROMPTS[role]}] + [
+    # Recompute the host date and web request state on every turn, not at import.
+    system = PROMPTS[role] + "\n\n" + runtime_context(req.web_enabled)
+    messages = [{"role": "system", "content": system}] + [
         m.model_dump() for m in req.messages
     ]
 

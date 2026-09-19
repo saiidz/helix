@@ -1,0 +1,39 @@
+{
+  "base_commit": "91bc79504c9e491ea422f2d1afba59aa057fa7e3",
+  "scope": "Focused Linux component checks, not a full app or live Windows validation",
+  "source_integrity": {
+    "helix/core.py_base_git_blob": "90311fa04a85d569706bcf3fd94ebe499250c9e1",
+    "tests/test_core.py_git_blob": "9369a0f7f0c1cdb94d0be513bc3d07536b610581",
+    "retrieved_source_hashes_verified_before_editing": true
+  },
+  "baseline": {
+    "command": "python -m pytest -q tests/test_core.py",
+    "passed": 33,
+    "failed": 1,
+    "failure": "Existing capability test expected the missing Internet/web browsing description"
+  },
+  "after_change": {
+    "command": "python -m pytest -q tests/test_core.py tests/test_runtime_context.py tests/test_web_check.py",
+    "passed": 63,
+    "failed": 0,
+    "compileall": "passed for changed Python modules and new tests"
+  },
+  "coverage": [
+    "All three normal chat roles receive per-request host date and web state",
+    "Day/year rollover and host-local versus UTC date",
+    "No invented model-training cutoff or successful-search claim",
+    "Web-disabled request remains disabled; cloud consent stays unchanged",
+    "Old assistant cutoff text does not supply the runtime clock",
+    "Connector diagnostic success, snippets-only, empty results, invalid input and failure use deterministic fixtures"
+  ],
+  "not_verified": [
+    "Full repository regression suite",
+    "Native Windows and browser/backend integration",
+    "Live Qwen/llama.cpp answers",
+    "Live web search and page retrieval from the founder PC",
+    "Deployment or running-process upgrade"
+  ],
+  "paid_provider_calls": 0,
+  "model_weights_changed": false,
+  "execution_permissions_changed": false
+}
