@@ -20,3 +20,7 @@
 #follow-through-mobile{display:none!important}
 @media(max-width:900px){#follow-through-mobile{display:inline-flex!important}.workspace-actions .web-toggle{display:none!important}}
 @media(max-width:650px){#follow-through-dialog{width:96vw;padding:16px}.follow-layout{grid-template-columns:1fr;gap:22px}.follow-overview{border-right:0;padding-right:0;border-bottom:1px solid var(--border);padding-bottom:16px}#follow-list{max-height:220px;overflow:auto}.follow-head h2{font-size:22px}.workspace-title .crumb,.workspace-title .slash{display:none!important}}
+
+/* Preserve readable active text in light mode; cyan remains the dark-mode accent. */
+:root[data-theme="light"] #follow-tabs button[aria-pressed="true"]{color:var(--text);border-color:var(--brand-blue)}
+:root[data-theme="light"] #active-outcome-chip button{color:var(--text)}

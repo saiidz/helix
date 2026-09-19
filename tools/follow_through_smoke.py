@@ -109,6 +109,8 @@ def main():
                     page.locator('#follow-through-mobile').click()
                     page.locator('[data-view="closed"]').click()
                     page.locator('.follow-card').filter(has_text='Client proposal approval').click()
+                    expect(page.locator('#follow-detail h3')).to_have_text('Client proposal approval')
+                    page.evaluate('document.documentElement.dataset.theme = "dark"')
                     page.screenshot(path=str(OUTPUT / 'dark-mobile.png'))
                     page.evaluate('document.documentElement.dataset.theme = "light"')
                     page.screenshot(path=str(OUTPUT / 'light-mobile.png'))
