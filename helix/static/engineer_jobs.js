@@ -148,7 +148,7 @@
     section.dataset.approvalId = approval.id || "";
   }
 
-  function renderSession(session, forceReset = false) {
+  function statusLabel(value) {\n    const raw = String(value || "running");\n    const labels = {\n      model_finished: "Completed · inspect evidence",\n      waiting_for_approval: "Waiting for your approval",\n      blocked_after_three_errors: "Blocked after repeated errors",\n      step_limit: "Stopped at step limit",\n      stopping: "Stopping…",\n      cancelled: "Cancelled",\n      interrupted: "Interrupted by restart"\n    };\n    return labels[raw] || raw.replaceAll("_", " ");\n  }\n\n  function renderSession(session, forceReset = false) {
     const state = drawer.querySelector("#engineer-state");
     const dot = state.querySelector("i");
     const stop = drawer.querySelector("#engineer-stop");
@@ -170,12 +170,12 @@
       cursor = 0;
       if (!selectedHistory) appendEvents([], true);
     }
-    const stateText = String(session.status || "running").replaceAll("_", " ");
+    const stateText = statusLabel(session.status);
     state.querySelector("span").textContent = stateText + (session.job_id ? " · " + session.job_id.slice(0, 8) : "");
     dot.classList.toggle("live", Boolean(session.active));
     stop.classList.toggle("engineer-hidden", !session.active);
     receipts.textContent = (session.receipts?.length || 0) + " receipt" + ((session.receipts?.length || 0) === 1 ? "" : "s");
-    renderApproval(session.approval || null);
+    if (!selectedHistory) renderApproval(session.approval || null);
 
     if (!selectedHistory) {
       appendEvents(session.events || [], changedSession || forceReset);
