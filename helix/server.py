@@ -30,12 +30,14 @@ from .core import (
     route_decision,
 )
 from .files import FileStore
+from .freshness import requires_live_evidence
 from .knowledge import KnowledgeStore
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
 from .memory import MEMORY_KINDS, MemoryStore
 from .projects import ProjectStore
 from .providers import ProviderError, complete, stream_complete
 from .tasks import TaskStore
+from .utility_chat import UtilityChat
 from .web import WebError, research_web
 
 
@@ -114,6 +116,13 @@ def create_app(
     calculator = CalculatorChat(api_key=api_key, ledger=ledger, memory=memory,
                                 projects=projects, gate=gate,
                                 monthly_limit=dollars_to_micro(settings.monthly_budget_usd))
+    utility = UtilityChat(
+        api_key=api_key,
+        ledger=ledger,
+        memory=memory,
+        gate=gate,
+        monthly_limit=dollars_to_micro(settings.monthly_budget_usd),
+    )
     assets = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=assets), name="static")
 
@@ -232,7 +241,19 @@ def create_app(
             lines.append(f"[T{index}] {item['title']}{due}")
         return "\n".join(lines)
 
+    def effective_web(req: ChatRequest) -> bool:
+        if req.web_mode == "off":
+            return False
+        if req.web_mode == "on":
+            return True
+        if req.web_mode == "auto":
+            return requires_live_evidence(req.messages[-1].content)
+        return req.web_enabled
+
     def resolve(req: ChatRequest):
+        web_requested = effective_web(req)
+        if req.web_enabled != web_requested:
+            req = req.model_copy(update={"web_enabled": web_requested})
         decision = route_decision(req)
         role = decision.role
         reason = decision.reason
@@ -415,6 +436,9 @@ def create_app(
                 "tools": False,
                 "knowledge_cache": True,
                 "calculator": True,
+                "clock": True,
+                "server_web_auto": True,
+                "tool_first_routing": True,
             },
         }
 
@@ -599,6 +623,9 @@ def create_app(
 
     @app.post("/api/route", dependencies=[Depends(auth)])
     def route(req: ChatRequest):
+        utility_result = utility.preview(req)
+        if utility_result is not None:
+            return utility_result
         calculation = calculator.preview(req)
         if calculation is not None:
             return calculation
@@ -634,7 +661,7 @@ def create_app(
             "routing_confidence": decision.confidence,
             "routing_scores": decision.scores,
             "reasoning_mode": mode,
-            "web_enabled": req.web_enabled,
+            "web_enabled": effective_web(req),
             "web_sources": web_sources,
             "web_error": web_error,
             "knowledge_used": [
@@ -662,6 +689,9 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
+        utility_result = utility.reply(req, idempotency_key, stream=False)
+        if utility_result is not None:
+            return utility_result
         calculation = calculator.reply(req, idempotency_key, stream=False)
         if calculation is not None:
             return calculation
@@ -788,7 +818,7 @@ def create_app(
                     if explicit_memory
                     else None
                 ),
-                "web_enabled": req.web_enabled,
+                "web_enabled": effective_web(req),
                 "web_sources": web_sources,
                 "web_error": web_error,
                 "knowledge_used": [
@@ -819,6 +849,9 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
+        utility_result = utility.reply(req, idempotency_key, stream=True)
+        if utility_result is not None:
+            return utility_result
         calculation = calculator.reply(req, idempotency_key, stream=True)
         if calculation is not None:
             return calculation
@@ -908,7 +941,7 @@ def create_app(
                 if explicit_memory
                 else None
             ),
-            "web_enabled": req.web_enabled,
+            "web_enabled": effective_web(req),
             "web_sources": web_sources,
             "web_error": web_error,
             "knowledge_used": [
