@@ -31,6 +31,7 @@ SECRET_NAMES = {".npmrc", ".pypirc", "credentials", "credentials.json", "secrets
 SECRET_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".sqlite", ".sqlite3", ".db"}
 RESERVED = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)", re.I)
 Approval = Callable[[str, str], bool]
+SafetyCheck = Callable[[], bool]
 
 
 class ToolError(ValueError):
@@ -62,7 +63,8 @@ def integer(value, low: int, high: int) -> int:
 
 class Workspace:
     def __init__(self, root: Path, history: Path, approve: Approval,
-                 cancel: threading.Event | None = None):
+                 cancel: threading.Event | None = None,
+                 safety_check: SafetyCheck | None = None):
         self.root = root.resolve(strict=True)
         if not self.root.is_dir() or self.root == Path(self.root.anchor) or self.root == Path.home().resolve():
             raise ToolError("Select a project directory, not an entire drive or your home directory")
@@ -72,8 +74,21 @@ class Workspace:
             raise ToolError("History must be outside the selected workspace")
         self.approve = approve
         self.cancel = cancel if cancel is not None else threading.Event()
+        self.safety_check = safety_check
         self.receipts: list[dict] = []
         self._denied: set[str] = set()
+
+    def _locked(self) -> bool:
+        if self.safety_check is None:
+            return False
+        try:
+            return self.safety_check() is True
+        except Exception:
+            return True
+
+    def _assert_unlocked(self) -> None:
+        if self._locked():
+            raise ToolError("Emergency Lockdown is active; Engineer actions are disabled")
 
     def path(self, name: str) -> Path:
         name = text(name, 500, empty=False).replace("\\", "/")
@@ -103,6 +118,7 @@ class Workspace:
         return candidate
 
     def _read(self, name: str) -> bytes:
+        self._assert_unlocked()
         path = self.path(name)
         if not path.is_file() or path.stat().st_size > MAX_FILE:
             raise ToolError("Expected a regular text file of at most 350,000 bytes")
@@ -117,9 +133,11 @@ class Workspace:
         return raw
 
     def list_files(self, limit=500) -> dict:
+        self._assert_unlocked()
         integer(limit, 1, 2000)
         files, visited = [], 0
         for folder, dirs, names in os.walk(self.root, followlinks=False):
+            self._assert_unlocked()
             if self.cancel.is_set():
                 raise ToolError("Stopped")
             visited += len(dirs) + len(names)
@@ -157,10 +175,12 @@ class Workspace:
                 "next_offset": offset + limit if offset + limit < len(content) else None}
 
     def search(self, query: str) -> dict:
+        self._assert_unlocked()
         text(query, 300, empty=False)
         listing = self.list_files(2000)
         results, scanned = [], 0
         for path in listing["files"]:
+            self._assert_unlocked()
             if self.cancel.is_set():
                 raise ToolError("Stopped")
             try:
@@ -179,14 +199,15 @@ class Workspace:
 
     def _permission(self, kind: str, preview: str) -> bool:
         fingerprint = digest((kind + preview).encode())
-        if self.cancel.is_set() or fingerprint in self._denied:
+        if self.cancel.is_set() or self._locked() or fingerprint in self._denied:
             return False
         allowed = self.approve(kind, visible(preview)) is True
         if not allowed:
             self._denied.add(fingerprint)
-        return allowed and not self.cancel.is_set()
+        return allowed and not self.cancel.is_set() and not self._locked()
 
     def edit(self, changes: list[dict]) -> dict:
+        self._assert_unlocked()
         if not isinstance(changes, list) or not 1 <= len(changes) <= 8:
             raise ToolError("Provide 1 to 8 changes, one per file")
         prepared, seen, previews = [], set(), []
@@ -248,6 +269,7 @@ class Workspace:
         changed = []
         try:
             for name, before, after in prepared:
+                self._assert_unlocked()
                 if self.cancel.is_set():
                     raise ToolError("Stopped before the next file write")
                 target = self.path(name)
@@ -263,6 +285,7 @@ class Workspace:
                         os.fsync(stream.fileno())
                     os.chmod(temporary, mode)
                     self.path(name)  # check again; not an OS compare-and-swap guarantee
+                    self._assert_unlocked()
                     os.replace(temporary, target)
                     changed.append(name)
                     if self._read(name) != after:
@@ -295,6 +318,7 @@ class Workspace:
             process.kill()
 
     def run_command(self, argv: list[str], timeout=120) -> dict:
+        self._assert_unlocked()
         integer(timeout, 1, 600)
         if not isinstance(argv, list) or not 1 <= len(argv) <= 64:
             raise ToolError("Command must be an argv array")
@@ -315,6 +339,7 @@ class Workspace:
                    + json.dumps(argv, ensure_ascii=True, indent=2))
         if not self._permission("RUN", preview):
             return {"status": "denied"}
+        self._assert_unlocked()
         allowed_env = {"PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP", "HOME",
                        "USERPROFILE", "LOCALAPPDATA", "APPDATA", "PATHEXT", "LANG"}
         env = {k: v for k, v in os.environ.items() if k.upper() in allowed_env}
@@ -339,7 +364,9 @@ class Workspace:
         started, stopped = time.monotonic(), None
         try:
             while process.poll() is None or not done.is_set():
-                if self.cancel.is_set():
+                if self._locked():
+                    stopped = "lockdown"
+                elif self.cancel.is_set():
                     stopped = "cancelled"
                 elif overflow.is_set():
                     stopped = "output_limit"
