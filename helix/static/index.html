@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Helix · Command Center</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/engineer_jobs.css">
   <script src="/static/app.js" defer></script>
+  <script src="/static/engineer_jobs.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -29,7 +31,7 @@
         <button id="projects-nav" class="nav-item" type="button"><span class="nav-icon">⌘</span><span>Projects</span><em>Ready</em></button>
         <button id="tasks-nav" class="nav-item" type="button"><span class="nav-icon">✓</span><span>Tasks</span><em>Ready</em></button>
         <button id="memory-nav" class="nav-item" type="button"><span class="nav-icon">◎</span><span>Memory</span><em>Ready</em></button>
-        <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Tools"><span class="nav-icon">◇</span><span>Tools</span><em>Soon</em></button>
+        <button id="engineer-jobs-nav" class="nav-item" type="button"><span class="nav-icon">◇</span><span>Engineer Jobs</span><em id="engineer-jobs-nav-state">Off</em></button>
         <button class="nav-item disabled" type="button" aria-disabled="true" data-soon="Voice"><span class="nav-icon">◉</span><span>Voice</span><em>Soon</em></button>
       </nav>
 
@@ -173,13 +175,13 @@
           <div><span id="task-cap-state" class="cap-state live"></span><strong>Tasks</strong><em id="task-cap-label">Ready</em></div>
           <div><span class="cap-state live"></span><strong>Learned knowledge</strong><em id="knowledge-cap-label">0 sourced</em></div>
           <div><span class="cap-state"></span><strong>Voice</strong><em>Off</em></div>
-          <div><span class="cap-state"></span><strong>Tools & actions</strong><em>Off</em></div>
+          <div><span id="engineer-jobs-cap-state" class="cap-state"></span><strong>Engineer jobs</strong><em id="engineer-jobs-cap-label">Off</em></div>
         </div>
       </section>
 
       <section class="intel-section safety">
         <div class="intel-section-title">Boundary</div>
-        <p>Helix only uses connected capabilities. Web research runs in Auto or On mode and returns source links; terminal, email, voice, and external actions remain disconnected.</p>
+        <p>Helix only uses connected capabilities. Engineer jobs require an operator-selected workspace and separate approval for every edit or command. Command execution is still unsandboxed in this preview; email, voice, and unattended external actions remain disconnected.</p>
       </section>
     </aside>
 
