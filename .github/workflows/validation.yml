@@ -2,7 +2,7 @@ name: HELIX validation
 
 on:
   push:
-    branches: [main, feat/codex-inspired-ui-v02]
+    branches: [main, feat/codex-inspired-ui-v02, feat/helix-useful-v03]
   pull_request:
     branches: [main]
   workflow_dispatch:
