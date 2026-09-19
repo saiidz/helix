@@ -148,7 +148,21 @@
     section.dataset.approvalId = approval.id || "";
   }
 
-  function statusLabel(value) {\n    const raw = String(value || "running");\n    const labels = {\n      model_finished: "Completed · inspect evidence",\n      waiting_for_approval: "Waiting for your approval",\n      blocked_after_three_errors: "Blocked after repeated errors",\n      step_limit: "Stopped at step limit",\n      stopping: "Stopping…",\n      cancelled: "Cancelled",\n      interrupted: "Interrupted by restart"\n    };\n    return labels[raw] || raw.replaceAll("_", " ");\n  }\n\n  function renderSession(session, forceReset = false) {
+  function statusLabel(value) {
+    const raw = String(value || "running");
+    const labels = {
+      model_finished: "Completed · inspect evidence",
+      waiting_for_approval: "Waiting for your approval",
+      blocked_after_three_errors: "Blocked after repeated errors",
+      step_limit: "Stopped at step limit",
+      stopping: "Stopping…",
+      cancelled: "Cancelled",
+      interrupted: "Interrupted by restart"
+    };
+    return labels[raw] || raw.replaceAll("_", " ");
+  }
+
+  function renderSession(session, forceReset = false) {
     const state = drawer.querySelector("#engineer-state");
     const dot = state.querySelector("i");
     const stop = drawer.querySelector("#engineer-stop");
@@ -291,9 +305,26 @@
     }
   }
 
+  async function probeAvailability() {
+    if (!key()) {
+      setAvailability(false, "Key");
+      return;
+    }
+    try {
+      const current = await request("/status");
+      status = current;
+      const active = current.session;
+      const text = active?.approval ? "Review" : active?.active ? "Running" : current.enabled ? "Ready" : "Off";
+      setAvailability(current.enabled, text);
+    } catch (_) {
+      setAvailability(false, "Unavailable");
+    }
+  }
+
   nav.addEventListener("click", open);
   keyInput?.addEventListener("change", () => {
     if (drawer && !drawer.hidden) refresh(true);
+    else probeAvailability();
   });
   document.addEventListener("keydown", event => {
     if (event.key === "Escape" && drawer && !drawer.hidden) close();
@@ -301,4 +332,5 @@
 
   buildDrawer();
   setAvailability(false, "Off");
+  setTimeout(probeAvailability, 300);
 })();
