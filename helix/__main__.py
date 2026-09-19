@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from .core import Settings
 from .server import create_app
 from .engineer_api import install_agent_routes
+from .learning_api import install_learning_routes
 
 
 def main():
@@ -27,6 +28,8 @@ def main():
     print(f"Open http://127.0.0.1:{args.port} — local-only prototype. No model weights included.", flush=True)
     print(f"Engineer workbench preview: http://127.0.0.1:{args.port}/engineer", flush=True)
     app = create_app(settings, key, args.ledger)
+    install_learning_routes(app, key, args.ledger.with_name("memory.sqlite3"))
+    print(f"Reviewed chat learning: http://127.0.0.1:{args.port}/learning (off by default)", flush=True)
     install_agent_routes(app, key, args.workspace, args.config)
     print(f"Engineer Agent: http://127.0.0.1:{args.port}/agent", flush=True)
     if args.workspace:
