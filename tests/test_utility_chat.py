@@ -214,7 +214,6 @@ def test_name_question_prefers_name_memory(profile_service):
     assert len(result["memory_used"]) == 1
 
 
-@pytest.mark.parametrize("stream", [False, True])
 def test_identity_respects_memory_off(profile_service):
     profile_service.memory.add_memory("My name is Mira", kind="profile", pinned=True)
     result = profile_service.reply(
@@ -229,6 +228,7 @@ def test_identity_respects_memory_off(profile_service):
     assert "My name is Mira" not in result["text"]
 
 
+@pytest.mark.parametrize("stream", [False, True])
 def test_identity_without_profile_memory_is_actionable_and_model_free(profile_service, stream):
     result = profile_service.reply(
         request("who am i?"),
