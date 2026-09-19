@@ -153,6 +153,7 @@ function looksLikeEngineerWorkspaceTask(text, selectedRole) {
 
 function verificationLabel(data) {
   const method = data?.verification_method;
+  if (method === "local_memory_disabled") return "memory off";
   if (method === "local_memory") return "memory · local";
   if (data?.answer_verified) {
     if (method === "host_clock") return "verified · host clock";
