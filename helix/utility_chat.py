@@ -7,7 +7,6 @@ import json
 import re
 import threading
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -18,22 +17,34 @@ from .memory import MemoryStore
 
 
 CLOCK_MODEL_ID = "helix/host-clock"
+PROFILE_MODEL_ID = "helix/profile-memory"
 
 _TIME_PATTERNS = (
-    r"^\s*(?:what(?:'s| is)\s+)?(?:the\s+)?time(?:\s+is\s+it)?(?:\s+now)?\s*[?!.]*\s*$",
-    r"^\s*what\s+time\s+is\s+it(?:\s+now)?\s*[?!.]*\s*$",
+    r"^\s*(?:what(?:'s| is)\s+)?(?:the\s+)?time(?:\s+is\s+it)?(?:\s+(?:now|rn))?\s*[?!.]*\s*$",
+    r"^\s*what\s+time\s+is\s+it(?:\s+(?:now|rn))?\s*[?!.]*\s*$",
     r"^\s*current\s+time\s*[?!.]*\s*$",
-    r"^\s*time\s+now\s*[?!.]*\s*$",
+    r"^\s*time\s+(?:now|rn)\s*[?!.]*\s*$",
 )
 _DATE_PATTERNS = (
     r"^\s*(?:what(?:'s| is)\s+)?(?:today'?s\s+)?date\s*[?!.]*\s*$",
-    r"^\s*what\s+(?:day|date)\s+is\s+it(?:\s+today)?\s*[?!.]*\s*$",
+    r"^\s*what\s+(?:day|date)\s+is\s+(?:it\s+)?(?:today)?\s*[?!.]*\s*$",
     r"^\s*current\s+date\s*[?!.]*\s*$",
     r"^\s*today'?s\s+date\s*[?!.]*\s*$",
+    r"^\s*(?:date|day)\s+today\s*[?!.]*\s*$",
 )
 _BOTH_PATTERNS = (
     r"^\s*(?:what(?:'s| is)\s+)?(?:the\s+)?(?:current\s+)?date\s+(?:and|&)\s+time\s*[?!.]*\s*$",
     r"^\s*(?:what(?:'s| is)\s+)?(?:the\s+)?(?:current\s+)?time\s+(?:and|&)\s+date\s*[?!.]*\s*$",
+)
+_PROFILE_PATTERNS = (
+    r"^\s*who\s+am\s+i\s*[?!.]*\s*$",
+    r"^\s*what\s+do\s+you\s+(?:know|remember)\s+about\s+me\s*[?!.]*\s*$",
+    r"^\s*tell\s+me\s+(?:about\s+)?myself\s*[?!.]*\s*$",
+    r"^\s*describe\s+me\s*[?!.]*\s*$",
+)
+_NAME_PATTERNS = (
+    r"^\s*what(?:'s|\s+is)\s+my\s+name\s*[?!.]*\s*$",
+    r"^\s*do\s+you\s+(?:know|remember)\s+my\s+name\s*[?!.]*\s*$",
 )
 
 
@@ -41,14 +52,30 @@ def _match(patterns: tuple[str, ...], text: str) -> bool:
     return any(re.match(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
 
 
+def _normalize_short_query(text: str) -> str:
+    cleaned = " ".join(text.strip().split())
+    # Common conversational typos should not defeat deterministic utilities.
+    cleaned = re.sub(
+        r"^(?:wha|wat|wht|wats|whats)\b",
+        "what",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned
+
+
 def detect_clock_request(text: str) -> str | None:
     """Return time/date/both only for local-now questions.
 
-    Location-qualified questions intentionally fall through to research/model
-    handling until HELIX has a timezone/place tool.
+    Location-qualified or event-specific questions intentionally fall through
+    to web/model handling until HELIX has a timezone/place utility.
     """
-    cleaned = " ".join(text.strip().split())
-    if len(cleaned) > 120 or re.search(r"\b(in|at)\s+[A-Z][\w -]{1,40}$", cleaned):
+    cleaned = _normalize_short_query(text)
+    if len(cleaned) > 120:
+        return None
+    if re.search(r"\b(?:in|at)\s+[A-Za-z][\w .'-]{1,40}\s*[?!.]*$", cleaned, flags=re.IGNORECASE):
+        return None
+    if re.search(r"\b(game|meeting|appointment|flight|event|show|movie|class|work)\b", cleaned, flags=re.IGNORECASE):
         return None
     if _match(_BOTH_PATTERNS, cleaned):
         return "both"
@@ -56,6 +83,26 @@ def detect_clock_request(text: str) -> str | None:
         return "time"
     if _match(_DATE_PATTERNS, cleaned):
         return "date"
+
+    # Short semantic fallback catches harmless typos/word-order variation while
+    # still requiring explicit current-time/date intent.
+    words = set(re.findall(r"[a-z']+", cleaned.lower()))
+    if len(words) <= 8:
+        if "time" in words and words & {"what", "now", "rn", "current", "it"}:
+            return "time"
+        if words & {"date", "day"} and words & {"what", "today", "current", "it"}:
+            return "date"
+    return None
+
+
+def detect_profile_request(text: str) -> str | None:
+    cleaned = _normalize_short_query(text)
+    if len(cleaned) > 160:
+        return None
+    if _match(_NAME_PATTERNS, cleaned):
+        return "name"
+    if _match(_PROFILE_PATTERNS, cleaned):
+        return "profile"
     return None
 
 
@@ -82,6 +129,43 @@ def clock_result(kind: str, now: datetime | None = None) -> dict:
     }
 
 
+def profile_result(kind: str, memories: list[dict]) -> dict:
+    if kind == "name":
+        name_memories = [
+            item for item in memories
+            if re.search(r"\b(?:my\s+name|name\s+is|called)\b", item["content"], flags=re.IGNORECASE)
+        ]
+        if name_memories:
+            return {
+                "text": "You told me: " + name_memories[0]["content"],
+                "used": name_memories[:1],
+                "found": True,
+            }
+        return {
+            "text": (
+                "I don't have your name saved in HELIX yet. "
+                "You can say: “Remember that my name is …”"
+            ),
+            "used": [],
+            "found": False,
+        }
+
+    if memories:
+        lines = ["Here’s what you’ve explicitly saved about yourself in HELIX:"]
+        for item in memories[:6]:
+            lines.append(f"- {item['content']}")
+        return {"text": "\n".join(lines), "used": memories[:6], "found": True}
+
+    return {
+        "text": (
+            "I don't have a profile memory saved for you yet. "
+            "Tell me something like “Remember that my name is …” or add profile memories in Memory."
+        ),
+        "used": [],
+        "found": False,
+    }
+
+
 class UtilityChat:
     def __init__(
         self,
@@ -99,25 +183,63 @@ class UtilityChat:
         self.monthly_limit = monthly_limit
 
     def preview(self, req: ChatRequest) -> dict | None:
-        kind = detect_clock_request(req.messages[-1].content)
-        if kind is None:
+        text = req.messages[-1].content
+        clock_kind = detect_clock_request(text)
+        profile_kind = None if clock_kind is not None else detect_profile_request(text)
+        if clock_kind is None and profile_kind is None:
             return None
+
         role = req.role.value if req.role is not None else "companion"
+        if clock_kind is not None:
+            return {
+                "role": role,
+                "reason": "Local time/date request; deterministic host clock, no model or web call",
+                "routing_confidence": 1.0,
+                "routing_scores": {name: int(name == role) for name in ("companion", "engineer", "sage")},
+                "reasoning_mode": "fast",
+                "provider_mode": "local_utility",
+                "model_id": CLOCK_MODEL_ID,
+                "provider_called": False,
+                "estimated_input_tokens": 0,
+                "max_output_tokens": req.max_output_tokens,
+                "reserved_model_cost_usd": 0,
+                "estimate_method": "No model invocation",
+                "memory_matches": 0,
+                "memory_used": [],
+                "memory_saved": None,
+                "files_used": [],
+                "knowledge_used": [],
+                "knowledge_learned": 0,
+                "web_enabled": False,
+                "web_used": False,
+                "web_sources": [],
+                "web_error": None,
+                "web_skipped_reason": "Host clock answers local current time/date directly",
+                "project": None,
+                "project_files_used": [],
+                "task_saved": None,
+                "conversation_id": req.conversation_id,
+                "actions_executed": [],
+                "utility_type": "clock",
+                "utility_kind": clock_kind,
+            }
+
+        memories = self.memory.self_profile_memories(limit=8)
         return {
             "role": role,
-            "reason": "Local time/date request; deterministic host clock, no model or web call",
+            "reason": "Self-profile question; explicit local profile memory, no model or web call",
             "routing_confidence": 1.0,
             "routing_scores": {name: int(name == role) for name in ("companion", "engineer", "sage")},
             "reasoning_mode": "fast",
-            "provider_mode": "local_utility",
-            "model_id": CLOCK_MODEL_ID,
+            "provider_mode": "local_memory",
+            "model_id": PROFILE_MODEL_ID,
             "provider_called": False,
             "estimated_input_tokens": 0,
             "max_output_tokens": req.max_output_tokens,
             "reserved_model_cost_usd": 0,
             "estimate_method": "No model invocation",
-            "memory_matches": 0,
-            "memory_used": [],
+            "memory_matches": len(memories),
+            "memory_used": [{"id": item["id"], "kind": item["kind"]} for item in memories[:6]],
             "memory_saved": None,
             "files_used": [],
             "knowledge_used": [],
@@ -126,13 +248,14 @@ class UtilityChat:
             "web_used": False,
             "web_sources": [],
             "web_error": None,
-            "web_skipped_reason": "Host clock answers local current time/date directly",
+            "web_skipped_reason": "Identity answer uses explicit local memory only",
             "project": None,
             "project_files_used": [],
             "task_saved": None,
             "conversation_id": req.conversation_id,
             "actions_executed": [],
-            "utility_kind": kind,
+            "utility_type": "profile",
+            "utility_kind": profile_kind,
         }
 
     def reply(self, req: ChatRequest, request_id: str, *, stream: bool = False):
@@ -154,7 +277,7 @@ class UtilityChat:
                     request_id,
                     fingerprint,
                     data["role"],
-                    CLOCK_MODEL_ID,
+                    data["model_id"],
                     0,
                     self.monthly_limit,
                 )
@@ -164,17 +287,39 @@ class UtilityChat:
             except BudgetExceeded as exc:
                 raise HTTPException(402, str(exc)) from exc
 
-            result = clock_result(data.pop("utility_kind"))
+            utility_type = data.pop("utility_type")
+            utility_kind = data.pop("utility_kind")
+            if utility_type == "clock":
+                result = clock_result(utility_kind)
+                data.update(
+                    text=result["text"],
+                    clock=result,
+                    answer_verified=True,
+                    verification_method="host_clock",
+                    verification_scope="Current date/time reported by the HELIX host operating system",
+                    tools_used=["clock"],
+                )
+            else:
+                memories = self.memory.self_profile_memories(limit=8)
+                result = profile_result(utility_kind, memories)
+                data.update(
+                    text=result["text"],
+                    profile_memory_found=result["found"],
+                    memory_used=[
+                        {"id": item["id"], "kind": item["kind"]}
+                        for item in result["used"]
+                    ],
+                    memory_matches=len(result["used"]),
+                    answer_verified=False,
+                    verification_method="local_memory",
+                    verification_scope="Explicit user profile/preference memories stored locally; not externally verified",
+                    tools_used=["memory"],
+                )
+
             data.update(
-                text=result["text"],
-                clock=result,
-                answer_verified=True,
-                verification_method="host_clock",
-                verification_scope="Current date/time reported by the HELIX host operating system",
                 model_cost_usd=0,
                 usage_reported_by_provider=False,
                 request_id=request_id,
-                tools_used=["clock"],
             )
             if req.conversation_id:
                 self.memory.save_message(req.conversation_id, "user", req.messages[-1].content)
@@ -184,7 +329,10 @@ class UtilityChat:
         except HTTPException:
             raise
         except Exception as exc:
-            raise HTTPException(500, "Clock request failed; no model or web call was made") from exc
+            raise HTTPException(
+                500,
+                "Local utility request failed; no model or web call was made",
+            ) from exc
         finally:
             try:
                 if reserved and not finished:
@@ -197,20 +345,25 @@ class UtilityChat:
 
         meta = {
             key: value for key, value in data.items()
-            if key not in {"text", "answer_verified", "verification_method", "verification_scope", "clock"}
+            if key not in {
+                "text", "answer_verified", "verification_method",
+                "verification_scope", "clock",
+            }
         }
+        done = {
+            "type": "done",
+            "model_cost_usd": 0,
+            "usage_reported_by_provider": False,
+            "answer_verified": data["answer_verified"],
+            "verification_method": data["verification_method"],
+            "verification_scope": data["verification_scope"],
+        }
+        if "clock" in data:
+            done["clock"] = data["clock"]
         frames = [
             dict(meta, type="meta"),
             {"type": "delta", "text": data["text"]},
-            {
-                "type": "done",
-                "model_cost_usd": 0,
-                "usage_reported_by_provider": False,
-                "answer_verified": True,
-                "verification_method": "host_clock",
-                "verification_scope": data["verification_scope"],
-                "clock": data["clock"],
-            },
+            done,
         ]
         return StreamingResponse(
             (json.dumps(frame, separators=(",", ":")) + "\n" for frame in frames),
