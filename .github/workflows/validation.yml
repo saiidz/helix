@@ -64,5 +64,20 @@ jobs:
           node --check helix/static/app.js
           node --check helix/static/engineer_jobs.js
           node --check helix/static/admin.js
+          node --check helix/static/follow_through.js
       - name: Offline routing and reasoning evaluation
         run: python -m tools.intelligence_eval
+      - name: Install optional pinned browser test dependency
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m pip install -r requirements-browser.txt
+      - name: Follow-through real-browser smoke (synthetic data)
+        if: matrix.os == 'ubuntu-latest'
+        run: python -m tools.follow_through_smoke
+      - name: Upload browser evidence
+        if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: helix-follow-through-browser-${{ github.sha }}
+          path: .ci-artifacts/follow-through/
+          retention-days: 7
+          if-no-files-found: warn

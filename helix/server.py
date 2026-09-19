@@ -30,6 +30,8 @@ from .core import (
     route_decision,
 )
 from .files import FileStore
+from .follow_through import FollowThroughStore
+from .follow_through_api import install_follow_through_routes
 from .freshness import requires_live_evidence
 from .knowledge import KnowledgeStore
 from .ledger import BudgetExceeded, DuplicateRequest, Ledger
@@ -113,6 +115,7 @@ def create_app(
 
     ledger = Ledger(ledger_path)
     memory = MemoryStore(memory_path or ledger_path.with_name("memory.sqlite3"))
+    follow_through = FollowThroughStore(memory.path, memory.user_id)
     knowledge = KnowledgeStore(ledger_path.with_name("knowledge.sqlite3"))
     file_store = FileStore(ledger_path.with_name("files.sqlite3"))
     projects = ProjectStore(ledger_path.with_name("projects.sqlite3"))
@@ -169,6 +172,8 @@ def create_app(
     def auth(authorization: str = Header(default="")):
         if not secrets.compare_digest(authorization, f"Bearer {api_key}"):
             raise HTTPException(401, "Valid local API key required")
+
+    install_follow_through_routes(app, follow_through, auth)
 
     def memory_context(memories: list[dict]) -> str:
         lines = [
@@ -282,6 +287,14 @@ def create_app(
                 )
 
         messages = make_messages(role, req)
+        if req.outcome_id:
+            if not req.memory_enabled:
+                raise HTTPException(422, "Enable private context before selecting a tracked outcome")
+            try:
+                context = follow_through.context(req.outcome_id)
+            except LookupError as exc:
+                raise HTTPException(404, "Selected outcome was deleted; clear it or choose another") from exc
+            messages.insert(1, {"role": "user", "content": context})
         memory_hits: list[dict] = []
         knowledge_hits: list[dict] = []
         knowledge_learned = 0
@@ -441,6 +454,8 @@ def create_app(
                 "files": True,
                 "projects": True,
                 "tasks": True,
+                "follow_through": True,
+                "follow_through_monitoring": False,
                 "voice": False,
                 "tools": False,
                 "knowledge_cache": True,

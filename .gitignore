@@ -37,3 +37,6 @@ private-data/
 Thumbs.db
 .vscode/
 .idea/
+
+# Synthetic browser validation evidence
+.ci-artifacts/
