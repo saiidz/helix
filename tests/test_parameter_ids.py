@@ -42,7 +42,9 @@ def test_long_labels_are_bounded_stable_and_distinct():
 # Every child runs only generated test fixtures in its temporary directory.
 # Bound the OS environment write as Windows does so Linux catches the regression.
 BOOTSTRAP = r'''
+import json
 import os
+from pathlib import Path
 import sys
 import pytest
 original_putenv = os.putenv
@@ -55,8 +57,27 @@ def bounded_putenv(key, value):
             raise ValueError("the environment variable is longer than 32767 characters")
     return original_putenv(key, value)
 
+class PhaseRecorder:
+    def __init__(self):
+        self.reports = []
+
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_runtest_makereport(self, item, call):
+        # Observe the normal report without suppressing or replacing failures.
+        outcome = yield
+        report = outcome.get_result()
+        self.reports.append({
+            "phase": report.when,
+            "outcome": report.outcome,
+            "exception_type": call.excinfo.type.__name__ if call.excinfo else None,
+        })
+
 os.putenv = bounded_putenv
-raise SystemExit(pytest.main(sys.argv[1:]))
+recorder = PhaseRecorder()
+exit_code = pytest.main(sys.argv[1:], plugins=[recorder])
+# Store only phase/type metadata, never the oversized payload or node ID.
+Path("pytest-outcomes.json").write_text(json.dumps(recorder.reports), encoding="utf-8")
+raise SystemExit(exit_code)
 '''
 
 CASES = r'''
@@ -133,15 +154,46 @@ def test_reproducer_with_windows_limit_and_original_payloads(tmp_path):
     assert [row["length"] for row in observed] == [350001, 350001]
 
 
-def test_failing_assertions_are_not_hidden(tmp_path):
+@pytest.mark.parametrize("traceback_style", ["no", "short", "line"])
+@pytest.mark.parametrize("ci_output", [False, True], ids=["local-output", "ci-output"])
+def test_failing_assertions_are_not_hidden(tmp_path, monkeypatch, traceback_style, ci_output):
+    # Local terminals can omit the exception message from the short summary.
+    # Exercise both environments rather than depend on how CI formats stdout.
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("BUILD_NUMBER", raising=False)
+    monkeypatch.setenv("COLUMNS", "80")
+    if ci_output:
+        monkeypatch.setenv("CI", "true")
     (tmp_path / "conftest.py").write_text(HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "test_failure.py").write_text(
         "import pytest\n@pytest.mark.parametrize('data', [b'x' * 350001])\n"
         "def test_still_fails(data):\n    assert len(data) == 0\n", encoding="utf-8",
     )
-    result = run_child(tmp_path)
-    assert result.returncode == 1
+    result = run_child(tmp_path, "--tb=" + traceback_style)
+    assert result.returncode == pytest.ExitCode.TESTS_FAILED
     assert "1 failed" in result.stdout
     assert "len350001" in result.stdout
-    assert "AssertionError" in result.stdout
     assert "environment variable is longer" not in result.stdout
+    # Console text is not evidence of exception type: --tb=no suppresses it,
+    # and pytest may truncate the summary. Check the actual test-phase report.
+    reports = json.loads((tmp_path / "pytest-outcomes.json").read_text(encoding="utf-8"))
+    assert reports == [
+        {"phase": "setup", "outcome": "passed", "exception_type": None},
+        {"phase": "call", "outcome": "failed", "exception_type": "AssertionError"},
+        {"phase": "teardown", "outcome": "passed", "exception_type": None},
+    ]
+
+
+def test_setup_errors_are_distinct_from_assertion_failures(tmp_path):
+    (tmp_path / "test_setup_error.py").write_text(
+        "import pytest\n@pytest.fixture\ndef broken():\n"
+        "    raise RuntimeError('intentional setup error')\n"
+        "def test_not_reached(broken):\n    assert False\n", encoding="utf-8",
+    )
+    result = run_child(tmp_path)
+    assert result.returncode == pytest.ExitCode.TESTS_FAILED
+    reports = json.loads((tmp_path / "pytest-outcomes.json").read_text(encoding="utf-8"))
+    assert reports == [
+        {"phase": "setup", "outcome": "failed", "exception_type": "RuntimeError"},
+        {"phase": "teardown", "outcome": "passed", "exception_type": None},
+    ]

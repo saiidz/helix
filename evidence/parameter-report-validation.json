@@ -1,0 +1,60 @@
+{
+  "base_commit": "a1c819fba38611d65a0726549d0d1e013c87009e",
+  "scope": "Connector-fetched parameter-ID tests on Linux; not the full repository or native Windows",
+  "python_version": "3.13.5",
+  "pytest_version": "9.0.2",
+  "source_integrity": {
+    "tests/conftest.py": "2a1a4aa1af02ec1081f1cee6b4643b2c8bf86e4c",
+    "tests/test_parameter_ids.py_before": "3ba5545f816815533c6c6872c0328baaf3d266b3",
+    "tests/test_parameter_ids.py_after": "ac7c46a6ba105a57c559048fb3a1d8c6bcb75af6",
+    "retrieved_blob_hashes_verified": true
+  },
+  "baseline": [
+    {
+      "command": "python -m pytest -q tests/test_parameter_ids.py --tb=short",
+      "environment": "CI=true inherited",
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "command": "env -u CI -u BUILD_NUMBER COLUMNS=80 python -m pytest -q tests/test_parameter_ids.py --tb=short",
+      "passed": 9,
+      "failed": 1,
+      "failure": "test_failing_assertions_are_not_hidden expected AssertionError text that the child console summary omitted"
+    }
+  ],
+  "after": [
+    {
+      "command": "python -m pytest -q tests/test_parameter_ids.py --tb=short",
+      "environment": "CI=true inherited",
+      "passed": 16,
+      "failed": 0
+    },
+    {
+      "command": "env -u CI -u BUILD_NUMBER COLUMNS=80 python -m pytest -q tests/test_parameter_ids.py --tb=short",
+      "passed": 16,
+      "failed": 0
+    }
+  ],
+  "compilation": {
+    "command": "python -m compileall -q tests/conftest.py tests/test_parameter_ids.py",
+    "passed": true
+  },
+  "coverage": [
+    "Actual child setup/call/teardown outcomes and exception types via the public pytest hook",
+    "Traceback modes no, short and line under both local and CI-style output",
+    "Deliberate assertion still yields TESTS_FAILED with successful setup and teardown",
+    "Setup RuntimeError remains distinct from a call-phase AssertionError",
+    "Original 350001-unit payloads and Windows-limit reproducer remain unchanged"
+  ],
+  "not_verified": [
+    "Native Windows execution",
+    "Full repository regression suite",
+    "Live application, model, or deployment"
+  ],
+  "production_code_changed": false,
+  "dependencies_changed": false,
+  "permissions_changed": false,
+  "model_calls": 0,
+  "paid_api_calls": 0
+}
