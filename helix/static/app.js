@@ -339,7 +339,8 @@ async function loadConversationById(id, announce = true) {
   if (!runtimeFeatures.persistent_conversations) return;
 
   const data = await api("/api/conversations/" + encodeURIComponent(id));
-  window.helixFollowThrough?.clear();
+  // Initial restoration must not discard a tracker form opened during startup.
+  if (conversationId !== data.conversation.id) window.helixFollowThrough?.clear();
   conversationId = data.conversation.id;
   window.localStorage.setItem("helixConversationId", conversationId);
   renderConversationMessages(data.conversation);

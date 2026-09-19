@@ -53,6 +53,7 @@ def main():
                                             args=['--no-sandbox'])
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 1050})
+                    page.set_default_timeout(15000)
                     errors = []
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.add_init_script('sessionStorage.setItem("helixLocalKey", ' + json.dumps(KEY) + ');'
@@ -78,6 +79,7 @@ def main():
                     expect(page.locator('[name="note"]')).to_have_value('')
                     expect(page.locator('[data-view="waiting"]')).to_have_attribute('aria-pressed', 'true')
                     checks.append('Reviewed correction and waiting state; acknowledgment is not resolution')
+                    page.locator('#follow-through-dialog').evaluate('(el) => {el.scrollTop = 0;}')
                     page.screenshot(path=str(OUTPUT / 'dark-desktop.png'))
                     page.evaluate('document.documentElement.dataset.theme = "light"')
                     page.screenshot(path=str(OUTPUT / 'light-desktop.png'))
@@ -118,6 +120,14 @@ def main():
                     (OUTPUT / 'report.json').write_text(json.dumps({'passed': checks,
                         'provider': 'demo; no live inference', 'external_actions': False}, indent=2), encoding='utf-8')
                     print('Browser smoke passed:', len(checks), 'checks')
+                except Exception as exc:
+                    (OUTPUT / 'failure.json').write_text(json.dumps({
+                        'passed_before_failure': checks, 'failure': str(exc),
+                        'browser_errors': errors if 'errors' in locals() else [],
+                        'provider': 'demo; synthetic data only'}, indent=2), encoding='utf-8')
+                    if 'page' in locals() and not page.is_closed():
+                        page.screenshot(path=str(OUTPUT / 'failure.png'))
+                    raise
                 finally:
                     browser.close()
         finally:
