@@ -1,0 +1,36 @@
+{
+  "base_commit": "e56d6c1324258a6dde9b21eee2dee4f661201bbd",
+  "scope": "Linux calculator and reply-service components; not full repository or native Windows",
+  "command": "python -m pytest -q tests/test_calculator.py tests/test_calculator_chat.py",
+  "passed": 112,
+  "failed": 0,
+  "real_components": [
+    "exact rational calculator",
+    "SQLite ledger",
+    "reply service",
+    "NDJSON StreamingResponse"
+  ],
+  "fixtures": [
+    "request objects",
+    "conversation history store",
+    "project metadata store"
+  ],
+  "compileall": "passed for changed Python sources and new tests",
+  "integration_inspection": "original server hash verified; auth decorators retained; calculator precedes model/web resolution",
+  "original_source_hashes": {
+    "helix/server.py": "33b8022b7bca4f325ea8dca97586b1e86ea058fc",
+    "helix/ledger.py": "3351bcd4938bee762abd45f6f8e9323f046042f9"
+  },
+  "not_verified": [
+    "full repository test suite",
+    "real browser/backend integration",
+    "native Windows",
+    "live model fallback behavior",
+    "installation on founder PC"
+  ],
+  "remaining_ui_gap": "Existing app.js footer hardcodes unverified; calculator identifies exact/rounded computation in body and API metadata",
+  "paid_calls": 0,
+  "model_calls": 0,
+  "web_calls": 0,
+  "python_version": "3.13.5"
+}

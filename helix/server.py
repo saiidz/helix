@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import __version__
+from .calculator_chat import CalculatorChat
 from .core import (
     ChatRequest,
     Settings,
@@ -110,6 +111,9 @@ def create_app(
     projects = ProjectStore(ledger_path.with_name("projects.sqlite3"))
     tasks = TaskStore(ledger_path.with_name("tasks.sqlite3"))
     gate = threading.BoundedSemaphore(2)
+    calculator = CalculatorChat(api_key=api_key, ledger=ledger, memory=memory,
+                                projects=projects, gate=gate,
+                                monthly_limit=dollars_to_micro(settings.monthly_budget_usd))
     assets = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=assets), name="static")
 
@@ -410,6 +414,7 @@ def create_app(
                 "voice": False,
                 "tools": False,
                 "knowledge_cache": True,
+                "calculator": True,
             },
         }
 
@@ -594,6 +599,9 @@ def create_app(
 
     @app.post("/api/route", dependencies=[Depends(auth)])
     def route(req: ChatRequest):
+        calculation = calculator.preview(req)
+        if calculation is not None:
+            return calculation
         (
             role,
             reason,
@@ -654,6 +662,9 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
+        calculation = calculator.reply(req, idempotency_key, stream=False)
+        if calculation is not None:
+            return calculation
         (
             role,
             reason,
@@ -808,6 +819,9 @@ def create_app(
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
     ):
+        calculation = calculator.reply(req, idempotency_key, stream=True)
+        if calculation is not None:
+            return calculation
         (
             role,
             reason,
