@@ -215,6 +215,20 @@ def test_name_question_prefers_name_memory(profile_service):
 
 
 @pytest.mark.parametrize("stream", [False, True])
+def test_identity_respects_memory_off(profile_service):
+    profile_service.memory.add_memory("My name is Mira", kind="profile", pinned=True)
+    result = profile_service.reply(
+        request("who am i?", web_mode="off").model_copy(update={"memory_enabled": False}),
+        "profile-memory-off-request",
+    )
+    assert result["provider_called"] is False
+    assert result["verification_method"] == "local_memory_disabled"
+    assert result["tools_used"] == []
+    assert result["memory_used"] == []
+    assert "memory is off" in result["text"].lower()
+    assert "My name is Mira" not in result["text"]
+
+
 def test_identity_without_profile_memory_is_actionable_and_model_free(profile_service, stream):
     result = profile_service.reply(
         request("who am i?"),
