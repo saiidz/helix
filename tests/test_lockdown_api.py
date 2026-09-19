@@ -71,7 +71,7 @@ def test_lockdown_persists_blocks_start_and_has_no_http_reset(tmp_path):
 def test_lockdown_invalidates_pending_edit_approval(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (root / "main.py").write_bytes(b"value = 1\n")
     sha = hashlib.sha256(b"value = 1\n").hexdigest()
     actions = [
         {"tool": "read_file", "path": "main.py"},
