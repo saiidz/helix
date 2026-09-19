@@ -152,8 +152,9 @@ function looksLikeEngineerWorkspaceTask(text, selectedRole) {
 }
 
 function verificationLabel(data) {
+  const method = data?.verification_method;
+  if (method === "local_memory") return "memory · local";
   if (data?.answer_verified) {
-    const method = data.verification_method;
     if (method === "host_clock") return "verified · host clock";
     if (method === "deterministic_exact_arithmetic") return "verified · calculator";
     return "verified";
