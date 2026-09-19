@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .engineer_agent import local_completion, run_agent
 from .engineer_jobs import EngineerJobStore
 from .engineer_tools import ToolError, Workspace
+from .safety import SafetyError, SafetyStore
 
 
 class StartTask(BaseModel):
@@ -40,10 +41,12 @@ class AgentSession:
         budget: int,
         job_id: str,
         jobs: EngineerJobStore,
+        safety: SafetyStore,
     ):
         self.id = uuid.uuid4().hex
         self.job_id = job_id
         self.jobs = jobs
+        self.safety = safety
         self.lock = threading.RLock()
         self.cancel = threading.Event()
         self.events: list[dict] = []
@@ -52,8 +55,16 @@ class AgentSession:
         self.pending = None
         self.decision_event = threading.Event()
         self.answer = False
+        self.stop_reason: str | None = None
+        self.finished = threading.Event()
         self.model, self.budget = model, budget
-        self.workspace = Workspace(root, history, self.approve, self.cancel)
+        self.workspace = Workspace(
+            root,
+            history,
+            self.approve,
+            self.cancel,
+            safety_check=self.safety.is_locked,
+        )
         self.thread: threading.Thread | None = None
 
     def emit(self, kind: str, value):
@@ -69,29 +80,39 @@ class AgentSession:
 
     def approve(self, kind: str, preview: str) -> bool:
         with self.lock:
-            if self.cancel.is_set():
+            if self.cancel.is_set() or self.safety.is_locked():
                 return False
             self.answer = False
             self.decision_event.clear()
             self.pending = {"id": secrets.token_urlsafe(24), "kind": kind, "preview": preview}
             self.status = "waiting_for_approval"
+            # Keep the event cursor atomic with exposing the pending approval.
+            self.emit("approval_requested", {"kind": kind})
         self.jobs.set_status(self.job_id, "waiting_for_approval")
-        self.emit("approval_requested", {"kind": kind})
 
         deadline = time.monotonic() + 600
         while not self.decision_event.wait(.1):
+            if self.safety.is_locked():
+                self.stop("lockdown")
+                break
             if self.cancel.is_set() or time.monotonic() > deadline:
                 break
 
         with self.lock:
             answer = self.answer and not self.cancel.is_set()
             self.pending = None
-            self.status = "running" if not self.cancel.is_set() else "stopping"
+            self.status = (
+                "lockdown" if self.stop_reason == "lockdown"
+                else "running" if not self.cancel.is_set()
+                else "stopping"
+            )
             next_status = self.status
         self.jobs.set_status(self.job_id, next_status)
         return answer
 
     def decide(self, identifier: str, decision: str):
+        if self.safety.is_locked():
+            raise ToolError("Emergency Lockdown is active; approval is invalid")
         with self.lock:
             if (
                 not self.pending
@@ -101,22 +122,31 @@ class AgentSession:
             ):
                 raise ToolError("Approval is absent, expired, cancelled, or already used")
             self.answer = decision == "approve"
+            # Record the decision event before waking the worker so status
+            # snapshots cannot observe the transition without its receipt.
+            self.emit("approval_decision", {"decision": decision})
             self.decision_event.set()
-        self.emit("approval_decision", {"decision": decision})
 
-    def stop(self):
+    def stop(self, reason: str = "user"):
         alive = False
         with self.lock:
+            if reason == "lockdown":
+                self.stop_reason = "lockdown"
+            elif self.stop_reason is None:
+                self.stop_reason = reason
             self.cancel.set()
             self.answer = False
             self.pending = None
             self.decision_event.set()
             if self.thread and self.thread.is_alive():
-                self.status = "stopping"
+                self.status = "lockdown" if self.stop_reason == "lockdown" else "stopping"
                 alive = True
         if alive:
-            self.jobs.set_status(self.job_id, "stopping")
-            self.emit("stop_requested", {"status": "stopping"})
+            self.jobs.set_status(self.job_id, self.status)
+            self.emit(
+                "lockdown" if self.stop_reason == "lockdown" else "stop_requested",
+                {"status": self.status},
+            )
 
     def snapshot(self, since=0):
         with self.lock:
@@ -131,8 +161,16 @@ class AgentSession:
                 "active": bool(self.thread and self.thread.is_alive()),
             }
 
+    def _monitor_safety(self):
+        while not self.finished.wait(.05):
+            if self.safety.is_locked():
+                self.stop("lockdown")
+                return
+
     def run(self, task: StartTask):
         self.jobs.set_status(self.job_id, "running")
+        monitor = threading.Thread(target=self._monitor_safety, daemon=True)
+        monitor.start()
         try:
             result = run_agent(
                 self.workspace,
@@ -143,6 +181,8 @@ class AgentSession:
                 self.budget,
                 task.skills,
             )
+            if self.stop_reason == "lockdown" or self.safety.is_locked():
+                result = {**result, "status": "lockdown"}
             self.emit("session_result", result)
             with self.lock:
                 self.status = result["status"]
@@ -153,19 +193,23 @@ class AgentSession:
                 len(self.workspace.receipts),
             )
         except Exception as exc:
-            result = {"status": "failed", "error": str(exc)}
+            result = {
+                "status": "lockdown" if self.safety.is_locked() else "failed",
+                "error": str(exc),
+            }
             try:
                 self.emit("error", str(exc))
             finally:
                 with self.lock:
-                    self.status = "failed"
+                    self.status = result["status"]
                 self.jobs.finish(
                     self.job_id,
-                    "failed",
+                    result["status"],
                     result,
                     len(self.workspace.receipts),
                 )
         finally:
+            self.finished.set()
             with self.lock:
                 self.pending = None
             if self.workspace.receipts:
@@ -190,6 +234,7 @@ def install_agent_routes(
     model_factory: Callable | None = None,
     history_root: Path | None = None,
     job_store_path: Path | None = None,
+    safety_store_path: Path | None = None,
 ):
     """No HTTP endpoint can set/change workspace. Operator chooses it at startup."""
     if len(api_key) < 24:
@@ -198,13 +243,20 @@ def install_agent_routes(
     root = workspace.resolve(strict=True) if workspace is not None else None
     history = history_root or Path.home() / ".helix" / "engineer-history"
     job_path = job_store_path or history.parent / "engineer-jobs.sqlite3"
+    safety_path = safety_store_path or history.parent / "safety.sqlite3"
     jobs = EngineerJobStore(job_path)
+    safety = SafetyStore(safety_path)
 
     if root is not None:
-        Workspace(root, history / "validation", lambda *_: False)
+        Workspace(
+            root,
+            history / "validation",
+            lambda *_: False,
+            safety_check=safety.is_locked,
+        )
 
     create_model = model_factory or (lambda: local_completion(config))
-    state = {"session": None, "jobs": jobs}
+    state = {"session": None, "jobs": jobs, "safety": safety}
     gate = threading.Lock()
 
     def auth(request: Request, authorization: str = Header(default="")):
@@ -223,14 +275,17 @@ def install_agent_routes(
         if since < 0:
             raise HTTPException(422, "Invalid event cursor")
         session = state["session"]
+        safety_state = safety.status()
         return {
             "enabled": root is not None,
+            "actions_enabled": root is not None and not safety_state["locked"],
             "workspace": str(root) if root else None,
             "os_sandbox": False,
             "cloud_fallback": False,
             "desktop_mouse_control": False,
             "history_persistent": True,
             "resume_after_restart": False,
+            "lockdown": safety_state,
             "session": (
                 session.snapshot(since if session.id == session_id else 0)
                 if session
@@ -251,6 +306,11 @@ def install_agent_routes(
 
     @router.post("/start")
     def start(task: StartTask):
+        if safety.is_locked():
+            raise HTTPException(
+                423,
+                "Emergency Lockdown is active. Reset it locally with RESET_HELIX_LOCKDOWN.cmd.",
+            )
         if root is None:
             raise HTTPException(
                 409,
@@ -275,6 +335,7 @@ def install_agent_routes(
                     budget,
                     job["id"],
                     jobs,
+                    safety,
                 )
             except (ValueError, OSError, ToolError) as exc:
                 raise HTTPException(422, str(exc)) from exc
@@ -295,6 +356,8 @@ def install_agent_routes(
 
     @router.post("/decision")
     def decision(payload: Decision):
+        if safety.is_locked():
+            raise HTTPException(423, "Emergency Lockdown is active; approvals are invalid")
         session = state["session"]
         if session is None:
             raise HTTPException(409, "No active task")
@@ -303,6 +366,17 @@ def install_agent_routes(
         except ToolError as exc:
             raise HTTPException(409, str(exc)) from exc
         return {"status": "decision_received"}
+
+    @router.post("/lockdown")
+    def lockdown():
+        try:
+            safety_state = safety.lock("Owner activated Emergency Lockdown from HELIX")
+        except SafetyError as exc:
+            raise HTTPException(503, str(exc)) from exc
+        session = state["session"]
+        if session and session.thread and session.thread.is_alive():
+            session.stop("lockdown")
+        return {"status": "locked", "lockdown": safety_state}
 
     @router.post("/stop")
     def stop():
@@ -320,7 +394,7 @@ def install_agent_routes(
     def shutdown():
         session = state["session"]
         if session:
-            session.stop()
+            session.stop("shutdown")
             if session.thread:
                 session.thread.join(timeout=3)
 

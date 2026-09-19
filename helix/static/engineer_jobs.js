@@ -8,6 +8,7 @@
   const capState = document.getElementById("engineer-jobs-cap-state");
   const capLabel = document.getElementById("engineer-jobs-cap-label");
   const keyInput = document.getElementById("key");
+  const globalLock = document.getElementById("emergency-lockdown-global");
 
   let drawer = null;
   let backdrop = null;
@@ -66,7 +67,7 @@
       '<div id="engineer-warning" class="engineer-warning">Command execution is not OS-sandboxed yet. Review every edit and command. Do not run HELIX as Administrator.</div>',
       '<form id="engineer-job-form" class="engineer-job-form"><textarea id="engineer-task" maxlength="6000" placeholder="Example: reproduce the failing checkout test, fix the smallest root cause, then rerun the relevant tests." required></textarea><div class="engineer-job-options"><label>Max steps <input id="engineer-max-steps" type="number" min="1" max="60" value="24"></label><button id="engineer-start" class="engineer-start" type="submit">Start job</button></div></form>',
       '<div id="engineer-state" class="engineer-state"><i></i><span>No active job</span></div>',
-      '<div class="engineer-actions"><button id="engineer-stop" class="engineer-stop engineer-hidden" type="button">Stop</button><button id="engineer-refresh" class="engineer-refresh" type="button">Refresh</button><button id="engineer-live" class="engineer-live engineer-hidden" type="button">Back to live</button></div>',
+      '<div class="engineer-actions"><button id="engineer-lockdown" class="engineer-lockdown" type="button">Emergency Lockdown</button><button id="engineer-stop" class="engineer-stop engineer-hidden" type="button">Stop</button><button id="engineer-refresh" class="engineer-refresh" type="button">Refresh</button><button id="engineer-live" class="engineer-live engineer-hidden" type="button">Back to live</button></div>',
       '<section id="engineer-approval" class="engineer-section engineer-approval" hidden><div class="engineer-section-title"><strong>Approval required</strong><span id="engineer-approval-kind"></span></div><pre id="engineer-approval-preview"></pre><div class="engineer-approval-actions"><button id="engineer-approve" class="engineer-approve" type="button">Approve exact action</button><button id="engineer-deny" class="engineer-deny" type="button">Deny</button></div></section>',
       '<section class="engineer-section"><div class="engineer-section-title"><strong id="engineer-activity-title">Live activity</strong><span id="engineer-receipts"></span></div><div id="engineer-events" class="engineer-events"><div class="engineer-empty">No activity yet.</div></div></section>',
       '<section class="engineer-section"><div class="engineer-section-title"><strong>Recent jobs</strong><span>local history</span></div><div id="engineer-history" class="engineer-history"><div class="engineer-empty">No jobs yet.</div></div></section>'
@@ -84,6 +85,7 @@
     });
     drawer.querySelector("#engineer-job-form").addEventListener("submit", startJob);
     drawer.querySelector("#engineer-stop").addEventListener("click", stopJob);
+    drawer.querySelector("#engineer-lockdown").addEventListener("click", emergencyLockdown);
     drawer.querySelector("#engineer-approve").addEventListener("click", () => decide("approve"));
     drawer.querySelector("#engineer-deny").addEventListener("click", () => decide("deny"));
     drawer.querySelector("#engineer-history").addEventListener("click", async event => {
@@ -146,6 +148,43 @@
     drawer.querySelector("#engineer-approval-kind").textContent = approval.kind || "Review";
     drawer.querySelector("#engineer-approval-preview").textContent = approval.preview || "";
     section.dataset.approvalId = approval.id || "";
+  }
+
+  function setLockdownUI(locked, state = null) {
+    const buttons = [globalLock, drawer?.querySelector("#engineer-lockdown")].filter(Boolean);
+    for (const button of buttons) {
+      button.disabled = Boolean(locked);
+      button.textContent = locked ? "LOCKED" : "Emergency Lockdown";
+      button.classList.toggle("locked", Boolean(locked));
+    }
+    if (locked && drawer) {
+      const warning = drawer.querySelector("#engineer-warning");
+      warning.textContent =
+        "EMERGENCY LOCKDOWN ACTIVE. Engineer actions are disabled across restarts. " +
+        "Reset only from a separate local terminal with RESET_HELIX_LOCKDOWN.cmd." +
+        (state?.reason ? " Reason: " + state.reason : "");
+      warning.classList.add("locked");
+    } else if (drawer) {
+      const warning = drawer.querySelector("#engineer-warning");
+      warning.textContent =
+        "Command execution is not OS-sandboxed yet. Review every edit and command. " +
+        "Do not run HELIX as Administrator.";
+      warning.classList.remove("locked");
+    }
+  }
+
+  async function emergencyLockdown() {
+    try {
+      await request("/lockdown", "POST", {});
+      selectedHistory = null;
+      await refresh(true);
+    } catch (error) {
+      if (drawer && !drawer.hidden) {
+        drawer.querySelector("#engineer-runtime").querySelector("small").textContent = error.message;
+      } else {
+        window.alert("Emergency Lockdown failed: " + error.message);
+      }
+    }
   }
 
   function statusLabel(value) {
@@ -221,15 +260,21 @@
       const runtime = drawer.querySelector("#engineer-runtime");
       const start = drawer.querySelector("#engineer-start");
       const form = drawer.querySelector("#engineer-task");
-      runtime.querySelector("strong").textContent = status.enabled ? "Workspace enabled" : "Read-only mode";
-      runtime.querySelector("small").textContent = status.enabled
-        ? status.workspace
-        : "Restart HELIX with an explicit --workspace path to enable reviewed engineering actions.";
-      start.disabled = !status.enabled;
-      form.disabled = !status.enabled;
+      const locked = Boolean(status.lockdown?.locked);
+      setLockdownUI(locked, status.lockdown);
+      runtime.querySelector("strong").textContent = locked
+        ? "EMERGENCY LOCKDOWN"
+        : status.enabled ? "Workspace enabled" : "Read-only mode";
+      runtime.querySelector("small").textContent = locked
+        ? "Engineer actions are disabled. Reset from RESET_HELIX_LOCKDOWN.cmd in a separate local terminal."
+        : status.enabled
+          ? status.workspace
+          : "Restart HELIX with an explicit --workspace path to enable reviewed engineering actions.";
+      start.disabled = !status.actions_enabled;
+      form.disabled = !status.actions_enabled;
       const s = status.session;
-      const navText = s?.approval ? "Review" : s?.active ? "Running" : status.enabled ? "Ready" : "Off";
-      setAvailability(status.enabled, navText);
+      const navText = locked ? "LOCKED" : s?.approval ? "Review" : s?.active ? "Running" : status.actions_enabled ? "Ready" : "Off";
+      setAvailability(status.actions_enabled, navText);
       renderSession(s, force);
       if (lastActive !== Boolean(s?.active) || force) {
         lastActive = Boolean(s?.active);
@@ -314,14 +359,17 @@
       const current = await request("/status");
       status = current;
       const active = current.session;
-      const text = active?.approval ? "Review" : active?.active ? "Running" : current.enabled ? "Ready" : "Off";
-      setAvailability(current.enabled, text);
+      const locked = Boolean(current.lockdown?.locked);
+      setLockdownUI(locked, current.lockdown);
+      const text = locked ? "LOCKED" : active?.approval ? "Review" : active?.active ? "Running" : current.actions_enabled ? "Ready" : "Off";
+      setAvailability(current.actions_enabled, text);
     } catch (_) {
       setAvailability(false, "Unavailable");
     }
   }
 
   nav.addEventListener("click", open);
+  globalLock?.addEventListener("click", emergencyLockdown);
   keyInput?.addEventListener("change", () => {
     if (drawer && !drawer.hidden) refresh(true);
     else probeAvailability();
