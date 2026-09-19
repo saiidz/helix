@@ -77,6 +77,46 @@ def test_web_off_overrides_freshness_heuristic(tmp_path, monkeypatch):
         assert response.json()["web_enabled"] is False
 
 
+def test_typo_date_chat_stream_bypasses_web_and_model(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "helix.server.research_web",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("date utility must not browse")),
+    )
+    monkeypatch.setattr(
+        "helix.server.stream_complete",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("date utility must not call model")),
+    )
+    app = create_app(settings(), KEY, tmp_path / "ledger-date.sqlite3")
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        response = client.post(
+            "/api/chat/stream",
+            headers={
+                "Authorization": "Bearer " + KEY,
+                "Idempotency-Key": "typo-date-routing-0001",
+            },
+            json={
+                "messages": [{"role": "user", "content": "wha date is it today"}],
+                "web_mode": "auto",
+            },
+        )
+        assert response.status_code == 200, response.text
+        events = [__import__("json").loads(line) for line in response.text.splitlines() if line.strip()]
+        assert [event["type"] for event in events] == ["meta", "delta", "done"]
+        assert events[0]["model_id"] == "helix/host-clock"
+        assert events[0]["provider_mode"] == "local_utility"
+        assert events[0]["provider_called"] is False
+        assert events[0]["web_sources"] == []
+        assert events[-1]["answer_verified"] is True
+        assert events[-1]["verification_method"] == "host_clock"
+        assert "September" in events[1]["text"] or any(
+            month in events[1]["text"]
+            for month in (
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "October", "November", "December"
+            )
+        )
+
+
 def test_clock_route_wins_before_web_or_model(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "helix.server.research_web",
