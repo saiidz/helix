@@ -61,7 +61,7 @@ def test_wrong_reset_phrase_keeps_lock(tmp_path):
 def test_workspace_fails_closed_for_reads_edits_and_commands(tmp_path):
     safety = SafetyStore(tmp_path / "safety.sqlite3")
     ws = make_workspace(tmp_path, safety)
-    (ws.root / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (ws.root / "main.py").write_bytes(b"value = 1\n")
     sha = hashlib.sha256(b"value = 1\n").hexdigest()
     safety.lock("fixture")
 
@@ -82,7 +82,7 @@ def test_lock_during_approval_invalidates_approval(tmp_path):
         return True
 
     ws = make_workspace(tmp_path, safety, approve)
-    (ws.root / "main.py").write_text("value = 1\n", encoding="utf-8")
+    (ws.root / "main.py").write_bytes(b"value = 1\n")
     sha = hashlib.sha256(b"value = 1\n").hexdigest()
     result = ws.edit([{"path": "main.py", "sha256": sha, "old": "1", "new": "2"}])
     assert result == {"status": "denied", "changed": []}
