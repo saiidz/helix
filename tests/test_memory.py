@@ -37,6 +37,19 @@ def test_explicit_memory_capture_is_conservative(tmp_path):
     assert len(store.list_memories()) == 1
 
 
+def test_self_profile_memories_ignore_project_and_other_people(tmp_path):
+    store = MemoryStore(tmp_path / "memory.sqlite3")
+    profile = store.add_memory("My name is Mira", kind="profile", importance=0.9)
+    preference = store.add_memory("I prefer concise answers", kind="preference", importance=0.8)
+    store.add_memory("My spouse likes coffee", kind="person", importance=1.0)
+    store.add_memory("HELIX uses FastAPI", kind="project", importance=1.0)
+    store.add_memory("I fixed a bug yesterday", kind="episodic", importance=1.0)
+
+    items = store.self_profile_memories()
+    assert [item["id"] for item in items] == [profile["id"], preference["id"]]
+    assert all(item["kind"] in {"profile", "preference"} for item in items)
+
+
 def test_conversation_persists_messages(tmp_path):
     store = MemoryStore(tmp_path / "memory.sqlite3")
     conversation = store.create_conversation()
